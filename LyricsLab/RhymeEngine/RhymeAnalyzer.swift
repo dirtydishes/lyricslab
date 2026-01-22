@@ -1,6 +1,6 @@
 import Foundation
 
-enum RhymeAnalyzer {
+nonisolated enum RhymeAnalyzer {
     nonisolated static func analyze(text: String, dictionary: CMUDictionary) -> RhymeAnalysis {
         let ns = text as NSString
         let fullRange = NSRange(location: 0, length: ns.length)

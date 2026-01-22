@@ -1,9 +1,9 @@
 import Foundation
 
-enum RhymeKey {
+nonisolated enum RhymeKey {
     // Common heuristic: from last stressed vowel to end.
     // Example: "S T AY1" -> "AY1" (or "AY1" plus following phonemes).
-    nonisolated static func fromPhonemes(_ phonemes: [String]) -> String? {
+    static func fromPhonemes(_ phonemes: [String]) -> String? {
         guard !phonemes.isEmpty else { return nil }
 
         // CMU marks stress with a trailing digit on vowel phonemes (0/1/2).

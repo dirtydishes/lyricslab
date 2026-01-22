@@ -2,6 +2,7 @@ import SwiftUI
 
 struct EditorSuggestionsBar: View {
     var suggestions: [String]
+    var isLoading: Bool = false
     var onInsert: (String) -> Void
 
     var body: some View {
@@ -10,11 +11,17 @@ struct EditorSuggestionsBar: View {
             ScrollView(.horizontal, showsIndicators: false) {
                 LazyHStack(spacing: 10) {
                     if suggestions.isEmpty {
-                        Text("No suggestions")
-                            .font(.subheadline)
-                            .foregroundStyle(.secondary)
-                            .padding(.horizontal, 14)
-                            .padding(.vertical, 10)
+                        HStack(spacing: 10) {
+                            if isLoading {
+                                ProgressView()
+                                    .controlSize(.small)
+                            }
+                            Text(isLoading ? "Loading rhymes..." : "No suggestions")
+                                .font(.subheadline)
+                                .foregroundStyle(.secondary)
+                        }
+                        .padding(.horizontal, 14)
+                        .padding(.vertical, 10)
                     } else {
                         ForEach(suggestions, id: \ .self) { word in
                             Button {

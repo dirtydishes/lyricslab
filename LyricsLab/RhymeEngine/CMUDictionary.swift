@@ -1,10 +1,10 @@
 import Foundation
 
-final class CMUDictionary {
+nonisolated final class CMUDictionary {
     nonisolated private let wordToRhymeKeys: [String: [String]]
     nonisolated private let rhymeKeyToWords: [String: [String]]
 
-    nonisolated init(wordToRhymeKeys: [String: [String]], rhymeKeyToWords: [String: [String]]) {
+    init(wordToRhymeKeys: [String: [String]], rhymeKeyToWords: [String: [String]]) {
         self.wordToRhymeKeys = wordToRhymeKeys
         self.rhymeKeyToWords = rhymeKeyToWords
     }
@@ -22,11 +22,19 @@ final class CMUDictionary {
 extension CMUDictionary {
     nonisolated static func loadBundledText() -> String? {
         let candidates = ["cmudict", "cmudict-0.7b"]
-        for name in candidates {
-            if let url = Bundle.main.url(forResource: name, withExtension: "txt"),
-               let data = try? Data(contentsOf: url),
-               let text = String(data: data, encoding: .utf8) {
-                return text
+
+        let bundles: [Bundle] = [
+            Bundle(for: CMUDictionary.self),
+            Bundle.main,
+        ]
+
+        for bundle in bundles {
+            for name in candidates {
+                if let url = bundle.url(forResource: name, withExtension: "txt"),
+                   let data = try? Data(contentsOf: url),
+                   let text = String(data: data, encoding: .utf8) {
+                    return text
+                }
             }
         }
 

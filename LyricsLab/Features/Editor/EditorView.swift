@@ -16,6 +16,9 @@ struct EditorView: View {
     @State private var rhymeTask: Task<Void, Never>?
     @State private var rhymeAnalysis: RhymeAnalysis = .empty
 
+    @State private var warmUpTask: Task<Void, Never>?
+    @State private var rhymeServiceReady = false
+
     @State private var suggestionsTask: Task<Void, Never>?
 
     @State private var suggestions: [String] = []
@@ -48,7 +51,7 @@ struct EditorView: View {
                     preferredTextColor: themeManager.theme.textPrimary,
                     preferredTintColor: themeManager.theme.accent
                 ) {
-                    EditorSuggestionsBar(suggestions: suggestions) { word in
+                    EditorSuggestionsBar(suggestions: suggestions, isLoading: !rhymeServiceReady) { word in
                         pendingInsertion = TextInsertion(id: UUID(), text: word)
                     }
                 }
@@ -59,6 +62,16 @@ struct EditorView: View {
         .onAppear {
             composition.lastOpenedAt = Date()
             isLyricsFocused = true
+
+            warmUpTask?.cancel()
+            warmUpTask = Task {
+                await RhymeService.shared.warmUp()
+                guard !Task.isCancelled else { return }
+                await MainActor.run {
+                    rhymeServiceReady = true
+                }
+            }
+
             scheduleRhymeAnalysis()
             refreshSuggestions()
         }
@@ -85,6 +98,9 @@ struct EditorView: View {
 
             suggestionsTask?.cancel()
             suggestionsTask = nil
+
+            warmUpTask?.cancel()
+            warmUpTask = nil
 
             composition.touch()
             do {
@@ -122,6 +138,7 @@ struct EditorView: View {
             guard !Task.isCancelled else { return }
             await MainActor.run {
                 rhymeAnalysis = analysis
+                rhymeServiceReady = true
             }
         }
     }
@@ -138,7 +155,10 @@ struct EditorView: View {
             )
 
             guard !Task.isCancelled else { return }
-            suggestions = next
+            await MainActor.run {
+                suggestions = next
+                rhymeServiceReady = true
+            }
         }
     }
 
