@@ -8,12 +8,14 @@ struct HomeView: View {
     @EnvironmentObject private var themeManager: ThemeManager
 
     @State private var searchText = ""
+    @State private var debouncedSearchText = ""
+    @State private var searchDebounceTask: Task<Void, Never>?
     @State private var showingSettings = false
     @State private var gearRotation: Angle = .zero
     @State private var newComposition: Composition?
 
     private var filteredCompositions: [Composition] {
-        let q = searchText.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        let q = debouncedSearchText.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
         guard !q.isEmpty else { return compositions }
         return compositions.filter { $0.searchBlob.contains(q) }
     }
@@ -39,6 +41,24 @@ struct HomeView: View {
             }
             .navigationTitle("LyricsLab")
             .searchable(text: $searchText)
+            .onAppear {
+                debouncedSearchText = searchText
+            }
+            .onChange(of: searchText) {
+                searchDebounceTask?.cancel()
+                let snapshot = searchText
+                searchDebounceTask = Task {
+                    try? await Task.sleep(for: .milliseconds(200))
+                    guard !Task.isCancelled else { return }
+                    await MainActor.run {
+                        debouncedSearchText = snapshot
+                    }
+                }
+            }
+            .onDisappear {
+                searchDebounceTask?.cancel()
+                searchDebounceTask = nil
+            }
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
                     Button {
