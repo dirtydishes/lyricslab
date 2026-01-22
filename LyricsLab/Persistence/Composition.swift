@@ -3,7 +3,9 @@ import SwiftData
 
 @Model
 final class Composition: Identifiable {
-    @Attribute(.unique) var id: UUID
+    // NOTE: Avoid `@Attribute(.unique)` here; CloudKit-backed SwiftData sync has
+    // strict requirements and unique constraints can prevent syncing.
+    var id: UUID
     var title: String
     var lyrics: String
     var createdAt: Date

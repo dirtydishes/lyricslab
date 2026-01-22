@@ -4,6 +4,8 @@ struct SettingsView: View {
     @EnvironmentObject private var themeManager: ThemeManager
     @AppStorage("icloudSyncEnabled") private var iCloudSyncEnabled = true
 
+    @State private var showingRestartAlert = false
+
     #if DEBUG
     @AppStorage("bypassIAP") private var bypassIAP = false
     #endif
@@ -30,10 +32,13 @@ struct SettingsView: View {
 
                 Section {
                     Toggle("iCloud Sync", isOn: $iCloudSyncEnabled)
+                        .onChange(of: iCloudSyncEnabled) {
+                            showingRestartAlert = true
+                        }
                 } header: {
                     Text("Sync")
                 } footer: {
-                    Text("UI is wired; persistence switching lands next.")
+                    Text("Changes apply after restarting the app. Turning sync off does not delete local data.")
                 }
 
                 #if DEBUG
@@ -45,6 +50,11 @@ struct SettingsView: View {
             .scrollContentBackground(.hidden)
         }
         .navigationTitle("Settings")
+        .alert("Restart Required", isPresented: $showingRestartAlert) {
+            Button("OK") {}
+        } message: {
+            Text("Restart LyricsLab to apply your iCloud Sync setting.")
+        }
     }
 }
 

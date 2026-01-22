@@ -8,17 +8,8 @@ struct LyricsLabApp: App {
     @StateObject private var themeManager = ThemeManager()
 
     private let modelContainer: ModelContainer = {
-        let schema = Schema([
-            Composition.self,
-        ])
-
-        let configuration = ModelConfiguration(
-            schema: schema,
-            isStoredInMemoryOnly: false
-        )
-
         do {
-            return try ModelContainer(for: schema, configurations: [configuration])
+            return try PersistenceFactory.makeContainer(iCloudSyncEnabled: UserDefaults.standard.object(forKey: "icloudSyncEnabled") as? Bool ?? true)
         } catch {
             fatalError("Failed to create ModelContainer: \(error)")
         }
