@@ -10,7 +10,10 @@
   - Lyrics editing (fast, stable, good cursor behavior)
   - Rhyme grouping + highlighting:
     - End rhymes
-    - Near rhymes (slant rhymes)
+    - Internal rhymes (within a line and connected across lines)
+        - Connect across up to 4 lines (sliding window)
+        - Matching end word can be grouped with an internal rhyme
+  - Near rhymes (slant rhymes)
   - Keyboard accessory bar with horizontally scrolling rhyme suggestions
 - Settings:
   - Accessed via spinning gear button on Home

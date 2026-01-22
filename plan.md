@@ -147,13 +147,33 @@ CMU entries map word → one or more pronunciations (phoneme arrays).
   - Handle apostrophes (e.g. “don’t”)
   - Simple stemming optional (future)
 
-### 4.3 Rhyme matching rules (MVP)
-**End rhyme detection:**
-- For each line, identify last “word-like token”.
-- Get its phonemes.
-- Determine rhyme key:
-  - From last stressed vowel phoneme to end (common rhyme heuristic).
-- Group lines/words with same rhyme key.
+### 4.3 Internal rhyme detection (MVP, cross-line up to 4 lines)
+Definition (MVP):
+- Detect rhyming words that occur inside lines and connect them across nearby lines, using a maximum span of 4 lines (current line ± 3).
+- The end word can participate in an internal rhyme group (groups may contain both internal and end occurrences).
+
+Algorithm (fast, deterministic, low-noise):
+1) Split lyrics into lines and compute `lineIndex` per token.
+2) Tokenize each line into word tokens, tracking:
+   - `rangeInFullText`
+   - `lineIndex`
+   - `isLineFinalToken: Bool`
+3) For each token, lookup CMU phonemes and compute a rhyme key (last stressed vowel → end).
+4) Build occurrences: `Occurrence(word, rhymeKey, lineIndex, range, isFinal)`
+5) Grouping with line-distance constraint:
+   - Two occurrences with the same rhyme key are "connected" if `abs(lineA - lineB) <= 3` (within 4-line span).
+   - Treat occurrences as nodes; add edges when connected; each connected component becomes a `RhymeGroup`.
+   - This keeps groups local/stanza-like.
+6) Noise control:
+   - Only highlight groups with size ≥ 2.
+   - Stricter near-rhyme threshold for internal than end rhymes.
+   - Cap active groups per 4-line window if cluttered, prioritizing: (a) more occurrences, (b) groups with line-final token, (c) groups near cursor.
+
+UI treatment:
+- End occurrences: background fill (stronger).
+- Internal occurrences: underline or faint tint (lighter).
+- Mixed groups share color; style is per-occurrence.
+- If token is line-final, always use end-occurrence styling.
 
 **Near rhyme (slant rhyme):**
 - Compute similarity between rhyme keys:
@@ -161,7 +181,7 @@ CMU entries map word → one or more pronunciations (phoneme arrays).
   - Provide threshold-based grouping.
 
 Output:
-- `RhymeGroup { id, type: end/near, key, colorIndex, occurrences[] }`
+- `RhymeGroup { id, type: end/internal/near, key, colorIndex, occurrences[] }`
 
 ### 4.4 Highlighting strategy
 - Highlight “rhyme words” in the editor, not entire lines.
@@ -193,6 +213,13 @@ UI:
 - Keyboard accessory bar with horizontal chips:
   - Word chip tap → insert
   - Long press → preview alternatives / pronunciation (future)
+
+Internal rhyme interaction (MVP behavior):
+- If cursor is mid-line, suggestions can target the last completed token (internal rhyme building) OR the active end-rhyme scheme.
+- Keep this as a simple heuristic; avoid UI mode switches.
+
+Cross-line behavior:
+- Prioritize suggestions matching the most recently active rhyme group within the last 4 lines.
 
 ---
 
