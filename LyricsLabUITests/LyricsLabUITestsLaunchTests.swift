@@ -1,9 +1,4 @@
-//
-//  LyricsLabUITestsLaunchTests.swift
-//  LyricsLabUITests
-//
-//  Created by Kellan Drucquer on 10/30/25.
-//
+// LyricsLabUITestsLaunchTests.swift
 
 import XCTest
 

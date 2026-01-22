@@ -1,9 +1,4 @@
-//
-//  LyricsLabTests.swift
-//  LyricsLabTests
-//
-//  Created by Kellan Drucquer on 10/30/25.
-//
+// LyricsLabTests.swift
 
 import Testing
 
