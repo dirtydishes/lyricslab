@@ -88,16 +88,23 @@ struct LyricsTextView<Accessory: View>: UIViewRepresentable {
             context.coordinator.isApplyingSwiftUIText = false
         }
 
-        if uiView.selectedRange != selectedRange {
-            uiView.selectedRange = selectedRange
-        }
-
         if let insertion, insertion.id != context.coordinator.lastInsertionID {
             context.coordinator.lastInsertionID = insertion.id
             context.coordinator.insert(text: insertion.text, into: uiView)
             DispatchQueue.main.async {
                 self.insertion = nil
             }
+        }
+
+        if let forced = context.coordinator.forcedSelectedRange {
+            if uiView.selectedRange != forced {
+                uiView.selectedRange = forced
+            }
+            if forced == selectedRange {
+                context.coordinator.forcedSelectedRange = nil
+            }
+        } else if uiView.selectedRange != selectedRange {
+            uiView.selectedRange = selectedRange
         }
 
         context.coordinator.applyHighlights(to: uiView, highlights: highlights)
@@ -120,6 +127,7 @@ extension LyricsTextView {
         fileprivate var parent: LyricsTextView
         fileprivate var isApplyingSwiftUIText = false
         fileprivate var lastInsertionID: UUID?
+        fileprivate var forcedSelectedRange: NSRange?
 
         private var accessoryHost: UIHostingController<Accessory>?
         private var accessoryContainer: UIInputView?
@@ -187,10 +195,13 @@ extension LyricsTextView {
             // Per product behavior: after inserting a suggestion, move the cursor
             // to the end of the inserted word.
             let newCursor = range.location + (text as NSString).length
-            textView.selectedRange = NSRange(location: newCursor, length: 0)
+            let newSelection = NSRange(location: newCursor, length: 0)
+            textView.selectedRange = newSelection
+
+            forcedSelectedRange = newSelection
 
             parent.text = newText
-            parent.selectedRange = textView.selectedRange
+            parent.selectedRange = newSelection
         }
 
         func applyHighlights(to textView: UITextView, highlights: [TextHighlight]) {
