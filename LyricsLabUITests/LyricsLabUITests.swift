@@ -28,6 +28,10 @@ final class LyricsLabUITests: XCTestCase {
 
     @MainActor
     func testLaunchPerformance() throws {
+        if ProcessInfo.processInfo.environment["RUN_PERF_TESTS"] != "1" {
+            throw XCTSkip("Performance tests are disabled by default. Set RUN_PERF_TESTS=1 to enable.")
+        }
+
         // This measures how long it takes to launch your application.
         measure(metrics: [XCTApplicationLaunchMetric()]) {
             XCUIApplication().launch()
