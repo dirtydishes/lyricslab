@@ -7,6 +7,14 @@ import UIKit
 struct TextHighlight: Equatable {
     var range: NSRange
 
+    enum Style: Equatable {
+        case end
+        case `internal`
+        case near
+    }
+
+    var style: Style
+
     #if canImport(UIKit)
     var color: UIColor
     #else
@@ -176,6 +184,8 @@ extension LyricsTextView {
             let newText = nsText.replacingCharacters(in: range, with: text)
             textView.text = newText
 
+            // Per product behavior: after inserting a suggestion, move the cursor
+            // to the end of the inserted word.
             let newCursor = range.location + (text as NSString).length
             textView.selectedRange = NSRange(location: newCursor, length: 0)
 
@@ -190,10 +200,22 @@ extension LyricsTextView {
             textView.textStorage.beginEditing()
             textView.textStorage.removeAttribute(.backgroundColor, range: fullRange)
             textView.textStorage.removeAttribute(.underlineStyle, range: fullRange)
+            textView.textStorage.removeAttribute(.underlineColor, range: fullRange)
 
             for h in highlights {
                 guard NSMaxRange(h.range) <= fullRange.length else { continue }
-                textView.textStorage.addAttribute(.backgroundColor, value: h.color.withAlphaComponent(0.22), range: h.range)
+                switch h.style {
+                case .end:
+                    textView.textStorage.addAttribute(.backgroundColor, value: h.color.withAlphaComponent(0.26), range: h.range)
+                case .internal:
+                    let style = NSUnderlineStyle.single.rawValue
+                    textView.textStorage.addAttribute(.underlineStyle, value: style, range: h.range)
+                    textView.textStorage.addAttribute(.underlineColor, value: h.color.withAlphaComponent(0.68), range: h.range)
+                case .near:
+                    let style = NSUnderlineStyle.single.rawValue | NSUnderlineStyle.patternDot.rawValue
+                    textView.textStorage.addAttribute(.underlineStyle, value: style, range: h.range)
+                    textView.textStorage.addAttribute(.underlineColor, value: h.color.withAlphaComponent(0.52), range: h.range)
+                }
             }
             textView.textStorage.endEditing()
         }

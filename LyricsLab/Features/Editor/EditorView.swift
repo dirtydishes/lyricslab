@@ -163,24 +163,55 @@ struct EditorView: View {
     }
 
     private var textHighlights: [TextHighlight] {
-        var out: [TextHighlight] = []
-        out.reserveCapacity(rhymeAnalysis.groups.reduce(into: 0) { $0 += $1.tokens.count })
+        struct RangeKey: Hashable {
+            var location: Int
+            var length: Int
+        }
+
+        func precedence(for style: TextHighlight.Style) -> Int {
+            switch style {
+            case .end: return 3
+            case .internal: return 2
+            case .near: return 1
+            }
+        }
 
         let palette = themeManager.theme.highlightPalette
         guard !palette.isEmpty else { return [] }
 
+        var best: [RangeKey: TextHighlight] = [:]
+        best.reserveCapacity(rhymeAnalysis.groups.reduce(into: 0) { $0 += $1.occurrences.count })
+
         for group in rhymeAnalysis.groups {
             let c = palette[group.colorIndex % palette.count]
-            for token in group.tokens {
+            for occ in group.occurrences {
+                let style: TextHighlight.Style
+                switch group.type {
+                case .near:
+                    style = .near
+                case .end, .`internal`:
+                    style = occ.isLineFinalToken ? .end : .internal
+                }
+
+                let key = RangeKey(location: occ.range.location, length: occ.range.length)
+
                 #if canImport(UIKit)
-                out.append(TextHighlight(range: token.range, color: UIColor(c)))
+                let candidate = TextHighlight(range: occ.range, style: style, color: UIColor(c))
                 #else
-                out.append(TextHighlight(range: token.range, color: c))
+                let candidate = TextHighlight(range: occ.range, style: style, color: c)
                 #endif
+
+                if let existing = best[key] {
+                    if precedence(for: candidate.style) > precedence(for: existing.style) {
+                        best[key] = candidate
+                    }
+                } else {
+                    best[key] = candidate
+                }
             }
         }
 
-        return out
+        return best.values.sorted { $0.range.location < $1.range.location }
     }
 }
 
