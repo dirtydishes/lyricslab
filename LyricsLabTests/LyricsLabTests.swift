@@ -62,6 +62,26 @@ struct RhymeEngineTests {
         #expect(near.contains("AY1 N") == true)
     }
 
+    @Test func internalNearRhymeThresholdIsStricterThanEnd() async throws {
+        let dict = makeDict(fromCMUText: """
+        TIME  T AY1 M
+        LINE  L AY1 N
+        """)
+
+        // End words: should form a near group (0.895 similarity) at the looser threshold.
+        let endText = "time\nline\n"
+        let endAnalysis = RhymeAnalyzer.analyze(text: endText, dictionary: dict)
+        let endNear = endAnalysis.groups.first(where: { $0.type == .near })
+        #expect(endNear != nil)
+        #expect(endNear?.occurrences.count == 2)
+
+        // Internal words: should NOT form a near group at the stricter internal threshold.
+        let internalText = "time foo\nline bar\n"
+        let internalAnalysis = RhymeAnalyzer.analyze(text: internalText, dictionary: dict)
+        let internalNear = internalAnalysis.groups.first(where: { $0.type == .near })
+        #expect(internalNear == nil)
+    }
+
     @Test func analyzeGroupsRepeatedEndRhymesAcrossLines() async throws {
         let cmuText = """
         TIME  T AY1 M
@@ -75,22 +95,31 @@ struct RhymeEngineTests {
         #expect(analysis.groups.count == 1)
         #expect(analysis.groups.first?.type == .end)
         #expect(analysis.groups.first?.rhymeKey == "AY1 M")
-        #expect(analysis.groups.first?.tokens.count == 2)
+        #expect(analysis.groups.first?.occurrences.count == 2)
 
-        let ranges = analysis.groups.first?.tokens.map { $0.range } ?? []
+        let ranges = analysis.groups.first?.occurrences.map { $0.range } ?? []
         #expect(ranges.contains(NSRange(location: 5, length: 4)))
         #expect(ranges.contains(NSRange(location: 13, length: 5)))
     }
 
-    @Test func currentLineRhymeKeyUsesLineEndingWord() async throws {
+    @Test func analyzeBuildsInternalGroupsAcrossNearbyLines() async throws {
         let dict = makeDict(fromCMUText: """
         TIME  T AY1 M
         RHYME  R AY1 M
+        SHINE  SH AY1 N
         """)
 
-        let text = "It's time\nTo rhyme\n"
-        let key = RhymeAnalyzer.currentLineRhymeKey(text: text, cursor: 15, dictionary: dict)
-        #expect(key == "AY1 M")
+        // "time" (internal), "rhyme" (internal), and "time" (line-final) should
+        // form one exact group within the 4-line span.
+        let text = "It's time to shine\nWe rhyme at night\nBack in time\n"
+        let analysis = RhymeAnalyzer.analyze(text: text, dictionary: dict)
+
+        let internalGroup = analysis.groups.first(where: { $0.rhymeKey == "AY1 M" && $0.type == .`internal` })
+        #expect(internalGroup != nil)
+        #expect(internalGroup?.occurrences.count == 3)
+
+        let finals = internalGroup?.occurrences.filter { $0.isLineFinalToken }.count ?? 0
+        #expect(finals == 1)
     }
 
     @Test func inferActiveRhymeKeyPrefersRecentRepeatInLookback() async throws {
@@ -103,6 +132,19 @@ struct RhymeEngineTests {
         let text = "It's time\nSome rhyme\nNext line\n"
         // Cursor in the third line.
         let key = RhymeAnalyzer.inferActiveRhymeKey(text: text, cursor: 24, dictionary: dict)
+        #expect(key == "AY1 M")
+    }
+
+    @Test func lastCompletedTokenUsesWordBeforeCursor() async throws {
+        let dict = makeDict(fromCMUText: """
+        TIME  T AY1 M
+        SHINE  SH AY1 N
+        """)
+
+        let text = "It's time to shine\n"
+        // Cursor after "time".
+        let cursor = ("It's time" as NSString).length
+        let key = RhymeAnalyzer.lastCompletedTokenRhymeKey(text: text, cursor: cursor, dictionary: dict)
         #expect(key == "AY1 M")
     }
 }
