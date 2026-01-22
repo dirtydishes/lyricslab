@@ -1,24 +1,18 @@
-//
-//  ContentView.swift
-//  LyricsLab
-//
-//  Created by Kellan Drucquer on 10/30/25.
-//
+// ContentView.swift
 
 import SwiftUI
+import SwiftData
 
 struct ContentView: View {
     var body: some View {
-        VStack {
-            Image(systemName: "globe")
-                .imageScale(.large)
-                .foregroundStyle(.tint)
-            Text("Hello, world!")
-        }
-        .padding()
+        HomeView()
     }
 }
 
-#Preview {
-    ContentView()
+struct ContentView_Previews: PreviewProvider {
+    static var previews: some View {
+        ContentView()
+            .modelContainer(for: Composition.self, inMemory: true)
+            .environmentObject(ThemeManager())
+    }
 }

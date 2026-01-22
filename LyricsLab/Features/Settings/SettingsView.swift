@@ -1,0 +1,58 @@
+import SwiftUI
+
+struct SettingsView: View {
+    @EnvironmentObject private var themeManager: ThemeManager
+    @AppStorage("icloudSyncEnabled") private var iCloudSyncEnabled = true
+
+    #if DEBUG
+    @AppStorage("bypassIAP") private var bypassIAP = false
+    #endif
+
+    var body: some View {
+        ZStack {
+            themeManager.theme.backgroundGradient
+                .ignoresSafeArea()
+
+            List {
+                Section("Themes") {
+                    Picker("Theme", selection: Binding(get: {
+                        themeManager.themeID
+                    }, set: { newValue in
+                        themeManager.themeID = newValue
+                    })) {
+                        ForEach(ThemeID.allCases) { id in
+                            Text(AppTheme.forID(id).displayName)
+                                .tag(id)
+                        }
+                    }
+                    .pickerStyle(.navigationLink)
+                }
+
+                Section {
+                    Toggle("iCloud Sync", isOn: $iCloudSyncEnabled)
+                } header: {
+                    Text("Sync")
+                } footer: {
+                    Text("UI is wired; persistence switching lands next.")
+                }
+
+                #if DEBUG
+                Section("Developer") {
+                    Toggle("Bypass IAP", isOn: $bypassIAP)
+                }
+                #endif
+            }
+            .scrollContentBackground(.hidden)
+        }
+        .navigationTitle("Settings")
+    }
+}
+
+struct SettingsView_Previews: PreviewProvider {
+    static var previews: some View {
+        NavigationStack {
+            SettingsView()
+        }
+        .environmentObject(ThemeManager())
+    }
+}
