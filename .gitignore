@@ -7,3 +7,6 @@
 # SwiftPM / Xcode build artifacts
 .build/
 DerivedData/
+
+# Local analysis artifacts
+token-usage-output.txt
