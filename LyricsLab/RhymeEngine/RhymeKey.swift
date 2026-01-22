@@ -23,7 +23,10 @@ nonisolated enum RhymeKey {
         return tail.isEmpty ? nil : tail.joined(separator: " ")
     }
 
+    // Used for end-rhyme near matching (more permissive).
     static let nearRhymeThreshold: Double = 0.84
+    // Used for internal-rhyme near matching (stricter to avoid "confetti").
+    static let nearRhymeThresholdInternal: Double = 0.90
 
     static func signature(fromRhymeKey key: String) -> Signature? {
         let parts = key.split(separator: " ").map(String.init)

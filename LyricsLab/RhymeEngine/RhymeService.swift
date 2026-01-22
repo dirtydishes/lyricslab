@@ -49,11 +49,22 @@ actor RhymeService {
         let dict = await dictionaryTask.value
         hasLoadedDictionary = true
 
-        guard let targetKey = RhymeAnalyzer.inferActiveRhymeKey(
+        let schemeKey = RhymeAnalyzer.inferActiveRhymeKey(
             text: text,
             cursor: cursorLocation,
-            dictionary: dict
-        ) else {
+            dictionary: dict,
+            lookbackLines: 4
+        )
+
+        let targetKey: String?
+        if RhymeAnalyzer.isCursorMidLine(text: text, cursor: cursorLocation),
+           let internalKey = RhymeAnalyzer.lastCompletedTokenRhymeKey(text: text, cursor: cursorLocation, dictionary: dict) {
+            targetKey = internalKey
+        } else {
+            targetKey = schemeKey
+        }
+
+        guard let targetKey else {
             return []
         }
 
