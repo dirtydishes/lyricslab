@@ -3,10 +3,19 @@ import Foundation
 nonisolated final class CMUDictionary {
     nonisolated private let wordToRhymeKeys: [String: [String]]
     nonisolated private let rhymeKeyToWords: [String: [String]]
+    nonisolated private let vowelGroupToKeys: [String: [String]]
+    nonisolated private let vowelGroupConsonantClassToKeys: [String: [String]]
 
-    init(wordToRhymeKeys: [String: [String]], rhymeKeyToWords: [String: [String]]) {
+    init(
+        wordToRhymeKeys: [String: [String]],
+        rhymeKeyToWords: [String: [String]],
+        vowelGroupToKeys: [String: [String]],
+        vowelGroupConsonantClassToKeys: [String: [String]]
+    ) {
         self.wordToRhymeKeys = wordToRhymeKeys
         self.rhymeKeyToWords = rhymeKeyToWords
+        self.vowelGroupToKeys = vowelGroupToKeys
+        self.vowelGroupConsonantClassToKeys = vowelGroupConsonantClassToKeys
     }
 
     nonisolated func rhymeKeys(for rawWord: String) -> [String] {
@@ -16,6 +25,33 @@ nonisolated final class CMUDictionary {
 
     nonisolated func words(forRhymeKey key: String) -> [String] {
         rhymeKeyToWords[key] ?? []
+    }
+
+    nonisolated func nearbyRhymeKeys(to key: String, limit: Int = 24) -> [String] {
+        guard let sig = RhymeKey.signature(fromRhymeKey: key) else { return [] }
+
+        let bucketKey = "\(sig.vowelGroupID)|\(sig.endingConsonantClassID ?? "none")"
+        let tight = vowelGroupConsonantClassToKeys[bucketKey] ?? []
+        let wide = vowelGroupToKeys[sig.vowelGroupID] ?? []
+
+        var candidates = Array((tight + wide).filter { $0 != key })
+        if candidates.isEmpty {
+            return []
+        }
+
+        // De-dupe while preserving approximate order (tight first, then wide).
+        var seen: Set<String> = []
+        candidates = candidates.filter { seen.insert($0).inserted }
+
+        let scored = candidates
+            .map { other in (other, RhymeKey.similarity(key, other)) }
+            .filter { $0.1 >= RhymeKey.nearRhymeThreshold && $0.1 < 1.0 }
+            .sorted { a, b in
+                if a.1 != b.1 { return a.1 > b.1 }
+                return a.0 < b.0
+            }
+
+        return scored.prefix(limit).map { $0.0 }
     }
 }
 
@@ -48,6 +84,8 @@ extension CMUDictionary {
     nonisolated static func parseIndex(text: String) -> CMUDictionaryIndex {
         var wordToKeys: [String: Set<String>] = [:]
         var keyToWords: [String: Set<String>] = [:]
+        var vowelGroupToKeys: [String: Set<String>] = [:]
+        var vowelGroupConsonantClassToKeys: [String: Set<String>] = [:]
 
         for rawLine in text.split(whereSeparator: \ .isNewline) {
             if rawLine.hasPrefix(";;;") {
@@ -72,6 +110,12 @@ extension CMUDictionary {
 
             wordToKeys[word, default: []].insert(key)
             keyToWords[key, default: []].insert(word)
+
+            if let sig = RhymeKey.signature(fromRhymeKey: key) {
+                vowelGroupToKeys[sig.vowelGroupID, default: []].insert(key)
+                let bucketKey = "\(sig.vowelGroupID)|\(sig.endingConsonantClassID ?? "none")"
+                vowelGroupConsonantClassToKeys[bucketKey, default: []].insert(key)
+            }
         }
 
         let normalizedWordToKeys = wordToKeys
@@ -80,7 +124,19 @@ extension CMUDictionary {
         let normalizedKeyToWords = keyToWords
             .mapValues { Array($0).sorted() }
 
-        return CMUDictionaryIndex(version: CMUDictionaryIndex.currentVersion, wordToKeys: normalizedWordToKeys, keyToWords: normalizedKeyToWords)
+        let normalizedVowelGroupToKeys = vowelGroupToKeys
+            .mapValues { Array($0).sorted() }
+
+        let normalizedVowelGroupConsonantClassToKeys = vowelGroupConsonantClassToKeys
+            .mapValues { Array($0).sorted() }
+
+        return CMUDictionaryIndex(
+            version: CMUDictionaryIndex.currentVersion,
+            wordToKeys: normalizedWordToKeys,
+            keyToWords: normalizedKeyToWords,
+            vowelGroupToKeys: normalizedVowelGroupToKeys,
+            vowelGroupConsonantClassToKeys: normalizedVowelGroupConsonantClassToKeys
+        )
     }
 
     nonisolated static func normalizeWord(_ word: String) -> String {
@@ -91,11 +147,13 @@ extension CMUDictionary {
 }
 
 nonisolated struct CMUDictionaryIndex: Codable, Sendable {
-    nonisolated static let currentVersion = 1
+    nonisolated static let currentVersion = 2
 
     var version: Int
     var wordToKeys: [String: [String]]
     var keyToWords: [String: [String]]
+    var vowelGroupToKeys: [String: [String]]
+    var vowelGroupConsonantClassToKeys: [String: [String]]
 }
 
 private enum SampleCMUDict {
