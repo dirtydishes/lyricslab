@@ -24,6 +24,9 @@ struct AppTheme: Equatable {
     var textSecondary: Color
     var accent: Color
 
+    // Used for rhyme groups. Keep high-contrast and stable.
+    var highlightPalette: [Color]
+
     var backgroundGradient: LinearGradient {
         LinearGradient(
             colors: [backgroundTop, backgroundBottom],
@@ -47,7 +50,15 @@ extension AppTheme {
                 elevatedSurface: Color.white.opacity(0.10),
                 textPrimary: Color.white,
                 textSecondary: Color.white.opacity(0.74),
-                accent: Color(red: 0.38, green: 0.88, blue: 0.92)
+                accent: Color(red: 0.38, green: 0.88, blue: 0.92),
+                highlightPalette: [
+                    Color(red: 0.38, green: 0.88, blue: 0.92),
+                    Color(red: 0.98, green: 0.55, blue: 0.37),
+                    Color(red: 0.98, green: 0.84, blue: 0.35),
+                    Color(red: 0.42, green: 0.90, blue: 0.55),
+                    Color(red: 0.38, green: 0.76, blue: 0.98),
+                    Color(red: 0.96, green: 0.46, blue: 0.82),
+                ]
             )
         case .plainLight:
             return AppTheme(
@@ -60,7 +71,15 @@ extension AppTheme {
                 elevatedSurface: Color.black.opacity(0.06),
                 textPrimary: Color.black,
                 textSecondary: Color.black.opacity(0.68),
-                accent: Color(red: 0.05, green: 0.45, blue: 0.95)
+                accent: Color(red: 0.05, green: 0.45, blue: 0.95),
+                highlightPalette: [
+                    Color(red: 0.05, green: 0.45, blue: 0.95),
+                    Color(red: 0.92, green: 0.36, blue: 0.24),
+                    Color(red: 0.86, green: 0.62, blue: 0.10),
+                    Color(red: 0.16, green: 0.58, blue: 0.28),
+                    Color(red: 0.10, green: 0.60, blue: 0.72),
+                    Color(red: 0.72, green: 0.28, blue: 0.58),
+                ]
             )
         case .plainDark:
             return AppTheme(
@@ -73,7 +92,15 @@ extension AppTheme {
                 elevatedSurface: Color.white.opacity(0.10),
                 textPrimary: Color.white,
                 textSecondary: Color.white.opacity(0.72),
-                accent: Color(red: 0.90, green: 0.55, blue: 0.15)
+                accent: Color(red: 0.90, green: 0.55, blue: 0.15),
+                highlightPalette: [
+                    Color(red: 0.90, green: 0.55, blue: 0.15),
+                    Color(red: 0.38, green: 0.88, blue: 0.92),
+                    Color(red: 0.98, green: 0.55, blue: 0.37),
+                    Color(red: 0.42, green: 0.90, blue: 0.55),
+                    Color(red: 0.38, green: 0.76, blue: 0.98),
+                    Color(red: 0.96, green: 0.46, blue: 0.82),
+                ]
             )
         case .dirtyDishes:
             // Catppuccin Mocha inspired, lavender-forward.
@@ -87,7 +114,15 @@ extension AppTheme {
                 elevatedSurface: Color.white.opacity(0.10),
                 textPrimary: Color(red: 0.94, green: 0.92, blue: 0.98),
                 textSecondary: Color(red: 0.78, green: 0.75, blue: 0.88),
-                accent: Color(red: 0.78, green: 0.72, blue: 0.96)
+                accent: Color(red: 0.78, green: 0.72, blue: 0.96),
+                highlightPalette: [
+                    Color(red: 0.78, green: 0.72, blue: 0.96),
+                    Color(red: 0.54, green: 0.90, blue: 0.78),
+                    Color(red: 0.98, green: 0.84, blue: 0.35),
+                    Color(red: 0.38, green: 0.76, blue: 0.98),
+                    Color(red: 0.98, green: 0.55, blue: 0.37),
+                    Color(red: 0.96, green: 0.46, blue: 0.82),
+                ]
             )
         }
     }

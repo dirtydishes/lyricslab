@@ -162,23 +162,15 @@ struct EditorView: View {
         }
     }
 
-    private var highlightPalette: [Color] {
-        [
-            themeManager.theme.accent,
-            Color(red: 0.98, green: 0.55, blue: 0.37),
-            Color(red: 0.98, green: 0.84, blue: 0.35),
-            Color(red: 0.42, green: 0.90, blue: 0.55),
-            Color(red: 0.38, green: 0.76, blue: 0.98),
-            Color(red: 0.96, green: 0.46, blue: 0.82),
-        ]
-    }
-
     private var textHighlights: [TextHighlight] {
         var out: [TextHighlight] = []
         out.reserveCapacity(rhymeAnalysis.groups.reduce(into: 0) { $0 += $1.tokens.count })
 
-        for (idx, group) in rhymeAnalysis.groups.enumerated() {
-            let c = highlightPalette[idx % highlightPalette.count]
+        let palette = themeManager.theme.highlightPalette
+        guard !palette.isEmpty else { return [] }
+
+        for group in rhymeAnalysis.groups {
+            let c = palette[group.colorIndex % palette.count]
             for token in group.tokens {
                 #if canImport(UIKit)
                 out.append(TextHighlight(range: token.range, color: UIColor(c)))
