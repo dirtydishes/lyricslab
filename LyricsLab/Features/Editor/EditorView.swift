@@ -9,7 +9,6 @@ struct EditorView: View {
     @EnvironmentObject private var themeManager: ThemeManager
 
     @State private var lyricsSelectedRange = NSRange(location: 0, length: 0)
-    @State private var pendingInsertion: TextInsertion?
     @State private var isLyricsFocused = false
     @State private var autosaveTask: Task<Void, Never>?
 
@@ -41,20 +40,36 @@ struct EditorView: View {
                 Divider()
                     .opacity(0.5)
 
+                #if canImport(UIKit)
+                EditorTextViewControllerRepresentable(
+                    text: $composition.lyrics,
+                    selectedRange: $lyricsSelectedRange,
+                    isFocused: $isLyricsFocused,
+                    highlights: textHighlights,
+                    suggestions: suggestions,
+                    isLoadingSuggestions: !rhymeServiceReady,
+                    preferredColorScheme: themeManager.theme.colorScheme,
+                    preferredTextColor: themeManager.theme.textPrimary,
+                    preferredTintColor: themeManager.theme.accent
+                )
+                #else
                 LyricsTextView(
                     text: $composition.lyrics,
                     selectedRange: $lyricsSelectedRange,
-                    insertion: $pendingInsertion,
+                    insertion: .constant(nil),
                     isFocused: $isLyricsFocused,
                     highlights: textHighlights,
                     preferredColorScheme: themeManager.theme.colorScheme,
                     preferredTextColor: themeManager.theme.textPrimary,
                     preferredTintColor: themeManager.theme.accent
                 ) {
-                    EditorSuggestionsBar(suggestions: suggestions, isLoading: !rhymeServiceReady) { word in
-                        pendingInsertion = TextInsertion(id: UUID(), text: word)
-                    }
+                    EmptyView()
                 }
+
+                EditorSuggestionsBar(suggestions: suggestions, isLoading: !rhymeServiceReady) { word in
+                    insertSuggestionFallback(word)
+                }
+                #endif
             }
         }
         .navigationTitle(composition.title.isEmpty ? "Untitled" : composition.title)
@@ -160,6 +175,21 @@ struct EditorView: View {
                 rhymeServiceReady = true
             }
         }
+    }
+
+    private func insertSuggestionFallback(_ word: String) {
+        let needsSpace: Bool
+        if let last = composition.lyrics.unicodeScalars.last {
+            needsSpace = !CharacterSet.whitespacesAndNewlines.contains(last)
+        } else {
+            needsSpace = true
+        }
+
+        composition.lyrics += word
+        if needsSpace {
+            composition.lyrics += " "
+        }
+        isLyricsFocused = true
     }
 
     private var textHighlights: [TextHighlight] {
