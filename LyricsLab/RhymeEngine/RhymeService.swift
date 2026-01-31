@@ -19,7 +19,11 @@ actor RhymeService {
                     rhymeKeyToWords: cached.keyToWords,
                     vowelGroupToKeys: cached.vowelGroupToKeys,
                     vowelGroupConsonantClassToKeys: cached.vowelGroupConsonantClassToKeys,
-                    wordToSyllableCount: cached.wordToSyllables
+                    wordToSyllableCount: cached.wordToSyllables,
+                    wordToTail2Keys: cached.wordToTail2Keys,
+                    tail2KeyToWords: cached.tail2KeyToWords,
+                    vowelGroupToTail2Keys: cached.vowelGroupToTail2Keys,
+                    vowelGroupConsonantClassToTail2Keys: cached.vowelGroupConsonantClassToTail2Keys
                 )
             }
 
@@ -31,7 +35,11 @@ actor RhymeService {
                 rhymeKeyToWords: index.keyToWords,
                 vowelGroupToKeys: index.vowelGroupToKeys,
                 vowelGroupConsonantClassToKeys: index.vowelGroupConsonantClassToKeys,
-                wordToSyllableCount: index.wordToSyllables
+                wordToSyllableCount: index.wordToSyllables,
+                wordToTail2Keys: index.wordToTail2Keys,
+                tail2KeyToWords: index.tail2KeyToWords,
+                vowelGroupToTail2Keys: index.vowelGroupToTail2Keys,
+                vowelGroupConsonantClassToTail2Keys: index.vowelGroupConsonantClassToTail2Keys
             )
         }
     }
@@ -40,16 +48,18 @@ actor RhymeService {
         text: String,
         cursorLocation: Int,
         userLexicon: [UserLexiconItem],
+        endRhymeTailLength: Int,
         maxCount: Int = 12
     ) async -> RhymeEditorAssistResult {
         let dict = await dictionaryTask.value
         hasLoadedDictionary = true
 
-        let targetKey = inferTargetKey(text: text, cursorLocation: cursorLocation, dictionary: dict)
+        let target = inferTarget(text: text, cursorLocation: cursorLocation, endRhymeTailLength: endRhymeTailLength, dictionary: dict)
         let suggestions: [String]
-        if let targetKey {
+        if let target {
             suggestions = makeSuggestions(
-                targetKey: targetKey,
+                targetKey: target.key,
+                targetTailLength: target.tailLength,
                 text: text,
                 cursorLocation: cursorLocation,
                 userLexicon: userLexicon,
@@ -79,38 +89,63 @@ actor RhymeService {
         return RhymeAnalyzer.analyze(text: text, dictionary: dict)
     }
 
+    func analyze(text: String, endRhymeTailLength: Int) async -> RhymeAnalysis {
+        let dict = await dictionaryTask.value
+        hasLoadedDictionary = true
+        return RhymeAnalyzer.analyze(text: text, dictionary: dict, endRhymeTailLength: endRhymeTailLength)
+    }
+
     func suggestions(
         text: String,
         cursorLocation: Int,
         userLexicon: [UserLexiconItem],
+        endRhymeTailLength: Int,
         maxCount: Int = 12
     ) async -> [String] {
-        let result = await editorAssist(text: text, cursorLocation: cursorLocation, userLexicon: userLexicon, maxCount: maxCount)
+        let result = await editorAssist(
+            text: text,
+            cursorLocation: cursorLocation,
+            userLexicon: userLexicon,
+            endRhymeTailLength: endRhymeTailLength,
+            maxCount: maxCount
+        )
         return result.suggestions
     }
 
     func suggestions(text: String, cursorLocation: Int, maxCount: Int = 12) async -> [String] {
-        await suggestions(text: text, cursorLocation: cursorLocation, userLexicon: [], maxCount: maxCount)
+        await suggestions(text: text, cursorLocation: cursorLocation, userLexicon: [], endRhymeTailLength: 1, maxCount: maxCount)
     }
 
-    private func inferTargetKey(text: String, cursorLocation: Int, dictionary: CMUDictionary) -> String? {
+    private struct Target {
+        var key: String
+        var tailLength: Int
+    }
+
+    private func inferTarget(text: String, cursorLocation: Int, endRhymeTailLength: Int, dictionary: CMUDictionary) -> Target? {
+        let endTailLength = max(1, min(2, endRhymeTailLength))
+
         let schemeKey = RhymeAnalyzer.inferActiveRhymeKey(
             text: text,
             cursor: cursorLocation,
             dictionary: dictionary,
-            lookbackLines: 4
+            lookbackLines: 4,
+            endRhymeTailLength: endTailLength
         )
 
         if RhymeAnalyzer.isCursorMidLine(text: text, cursor: cursorLocation),
            let internalKey = RhymeAnalyzer.lastCompletedTokenRhymeKey(text: text, cursor: cursorLocation, dictionary: dictionary) {
-            return internalKey
+            return Target(key: internalKey, tailLength: 1)
         }
 
-        return schemeKey
+        if let schemeKey {
+            return Target(key: schemeKey, tailLength: endTailLength)
+        }
+        return nil
     }
 
     private func makeSuggestions(
         targetKey: String,
+        targetTailLength: Int,
         text: String,
         cursorLocation: Int,
         userLexicon: [UserLexiconItem],
@@ -184,7 +219,7 @@ actor RhymeService {
         candidates.reserveCapacity(2048)
 
         // 1) Exact candidates from CMU dict.
-        for w in dictionary.words(forRhymeKey: targetKey).prefix(600) {
+        for w in dictionary.words(forRhymeKey: targetKey, tailLength: targetTailLength).prefix(600) {
             let normalized = w
             let c = Candidate(
                 normalized: normalized,
@@ -200,10 +235,10 @@ actor RhymeService {
         }
 
         // 2) Near candidates from bucketed nearby keys.
-        let nearKeys = dictionary.nearbyRhymeKeys(to: targetKey, limit: 28)
+        let nearKeys = dictionary.nearbyRhymeKeys(to: targetKey, tailLength: targetTailLength, limit: 28)
         for k in nearKeys {
             let sim = RhymeKey.similarity(targetKey, k)
-            for w in dictionary.words(forRhymeKey: k).prefix(4) {
+            for w in dictionary.words(forRhymeKey: k, tailLength: targetTailLength).prefix(4) {
                 let normalized = w
                 if let existing = candidates[normalized], existing.rhymeScore >= sim {
                     continue
@@ -223,7 +258,7 @@ actor RhymeService {
 
         // 3) Merge user lexicon candidates (global; already accepted/used by the user).
         for item in userLexicon {
-            let keys = dictionary.rhymeKeys(for: item.normalized)
+            let keys = dictionary.rhymeKeys(for: item.normalized, tailLength: targetTailLength)
             if keys.isEmpty {
                 continue
             }

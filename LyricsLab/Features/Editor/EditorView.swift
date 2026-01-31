@@ -46,6 +46,7 @@ struct EditorView: View {
                     text: $composition.lyrics,
                     selectedRange: $lyricsSelectedRange,
                     isFocused: $isLyricsFocused,
+                    endRhymeTailLength: $composition.endRhymeTailLength,
                     highlights: textHighlights,
                     suggestions: suggestions,
                     isLoadingSuggestions: !rhymeServiceReady,
@@ -71,7 +72,19 @@ struct EditorView: View {
                     EmptyView()
                 }
 
-                EditorSuggestionsBar(suggestions: suggestions, isLoading: !rhymeServiceReady, barPosition: barPosition) { word in
+                EditorSuggestionsBar(
+                    suggestions: suggestions,
+                    isLoading: !rhymeServiceReady,
+                    barPosition: barPosition,
+                    endRhymeTailLength: composition.endRhymeTailLength,
+                    onSetEndRhymeTailLength: { next in
+                        let clamped = max(1, min(2, next))
+                        if composition.endRhymeTailLength != clamped {
+                            composition.endRhymeTailLength = clamped
+                            try? modelContext.save()
+                        }
+                    }
+                ) { word in
                     insertSuggestionFallback(word)
                     recordSuggestionAcceptance(word)
                 }
@@ -102,6 +115,12 @@ struct EditorView: View {
             scheduleAutosave()
         }
         .onChange(of: composition.lyrics) {
+            scheduleAutosave()
+            scheduleRhymeAnalysis()
+            refreshAssist()
+        }
+        .onChange(of: composition.endRhymeTailLength) {
+            // End-rhyme tail length affects both highlights (end groups) and suggestion targeting.
             scheduleAutosave()
             scheduleRhymeAnalysis()
             refreshAssist()
@@ -155,8 +174,8 @@ struct EditorView: View {
             try? await Task.sleep(for: .milliseconds(325))
 
             let snapshot = await MainActor.run { composition.lyrics }
-
-            let analysis = await RhymeService.shared.analyze(text: snapshot)
+            let tailLength = await MainActor.run { max(1, min(2, composition.endRhymeTailLength)) }
+            let analysis = await RhymeService.shared.analyze(text: snapshot, endRhymeTailLength: tailLength)
 
             guard !Task.isCancelled else { return }
             await MainActor.run {
@@ -171,6 +190,7 @@ struct EditorView: View {
 
         let textSnapshot = composition.lyrics
         let cursorSnapshot = lyricsSelectedRange.location
+        let tailLengthSnapshot = max(1, min(2, composition.endRhymeTailLength))
 
         // Snapshot the lexicon on the main actor (SwiftData), then compute assist off-main.
         let lexiconSnapshot = UserLexiconStore.fetchTopUserLexiconItems(in: modelContext, limit: 512)
@@ -180,6 +200,7 @@ struct EditorView: View {
                 text: textSnapshot,
                 cursorLocation: cursorSnapshot,
                 userLexicon: lexiconSnapshot,
+                endRhymeTailLength: tailLengthSnapshot,
                 maxCount: 12
             )
 

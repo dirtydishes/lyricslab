@@ -4,6 +4,8 @@ struct EditorSuggestionsBar: View {
     var suggestions: [String]
     var isLoading: Bool = false
     var barPosition: BarPosition? = nil
+    var endRhymeTailLength: Int = 1
+    var onSetEndRhymeTailLength: ((Int) -> Void)? = nil
     var onInsert: (String) -> Void
 
     var body: some View {
@@ -14,6 +16,28 @@ struct EditorSuggestionsBar: View {
                 BarRulerView(barPosition: barPosition)
                     .padding(.horizontal, 12)
                     .padding(.vertical, 8)
+            }
+
+            if let onSetEndRhymeTailLength {
+                HStack(spacing: 10) {
+                    Text("End target")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(.secondary)
+
+                    Picker(
+                        "End rhyme target",
+                        selection: Binding(
+                            get: { endRhymeTailLength },
+                            set: { onSetEndRhymeTailLength($0) }
+                        )
+                    ) {
+                        Text("1").tag(1)
+                        Text("2").tag(2)
+                    }
+                    .pickerStyle(.segmented)
+                }
+                .padding(.horizontal, 12)
+                .padding(.bottom, 8)
             }
             ScrollView(.horizontal, showsIndicators: false) {
                 LazyHStack(spacing: 10) {
@@ -94,7 +118,9 @@ struct EditorSuggestionsBar_Previews: PreviewProvider {
     static var previews: some View {
         EditorSuggestionsBar(
             suggestions: ["time", "rhyme", "shine", "line"],
-            barPosition: BarPosition(step: 6, syllablesBeforeCaret: 7, totalSyllables: 15, lowConfidenceTokenCount: 1)
+            barPosition: BarPosition(step: 6, syllablesBeforeCaret: 7, totalSyllables: 15, lowConfidenceTokenCount: 1),
+            endRhymeTailLength: 2,
+            onSetEndRhymeTailLength: { _ in }
         ) { _ in }
             .previewLayout(.sizeThatFits)
     }

@@ -6,6 +6,7 @@ struct EditorTextViewControllerRepresentable: UIViewControllerRepresentable {
     @Binding var text: String
     @Binding var selectedRange: NSRange
     @Binding var isFocused: Bool
+    @Binding var endRhymeTailLength: Int
 
     var highlights: [TextHighlight]
     var suggestions: [String]
@@ -37,6 +38,11 @@ struct EditorTextViewControllerRepresentable: UIViewControllerRepresentable {
         vc.onSuggestionAccepted = { word in
             onSuggestionAccepted?(word)
         }
+        vc.onEndRhymeTailLengthChanged = { next in
+            if endRhymeTailLength != next {
+                endRhymeTailLength = next
+            }
+        }
         return vc
     }
 
@@ -49,6 +55,7 @@ struct EditorTextViewControllerRepresentable: UIViewControllerRepresentable {
             suggestions: suggestions,
             isLoadingSuggestions: isLoadingSuggestions,
             barPosition: barPosition,
+            endRhymeTailLength: endRhymeTailLength,
             preferredColorScheme: preferredColorScheme,
             preferredTextColor: preferredTextColor,
             preferredTintColor: preferredTintColor
