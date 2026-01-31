@@ -21,6 +21,10 @@ final class Composition: Identifiable {
     // Default stays conservative for compatibility.
     var endRhymeTailLength: Int = 1
 
+    // JSON-encoded user overrides for inferred section/bracket labels.
+    // Stored as a blob to keep SwiftData + CloudKit sync simple.
+    var sectionOverridesBlob: String = ""
+
     // A lightweight, denormalized field to make Home search fast.
     // Updated whenever title/lyrics change.
     var searchBlob: String = ""
@@ -33,7 +37,8 @@ final class Composition: Identifiable {
         updatedAt: Date = Date(),
         lastOpenedAt: Date? = nil,
         lexiconState: CompositionLexiconState? = nil,
-        endRhymeTailLength: Int = 1
+        endRhymeTailLength: Int = 1,
+        sectionOverridesBlob: String = ""
     ) {
         self.id = id
         self.title = title
@@ -43,6 +48,7 @@ final class Composition: Identifiable {
         self.lastOpenedAt = lastOpenedAt
         self.lexiconState = lexiconState
         self.endRhymeTailLength = endRhymeTailLength
+        self.sectionOverridesBlob = sectionOverridesBlob
         self.searchBlob = Composition.makeSearchBlob(title: title, lyrics: lyrics)
     }
 

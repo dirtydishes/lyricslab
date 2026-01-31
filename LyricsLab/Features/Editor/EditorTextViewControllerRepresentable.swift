@@ -8,6 +8,9 @@ struct EditorTextViewControllerRepresentable: UIViewControllerRepresentable {
     @Binding var isFocused: Bool
     @Binding var endRhymeTailLength: Int
 
+    var sectionBrackets: [SectionBracket]
+    var onSetSectionOverride: ((String, Int?) -> Void)?
+
     var highlights: [TextHighlight]
     var suggestions: [String]
     var isLoadingSuggestions: Bool
@@ -43,6 +46,9 @@ struct EditorTextViewControllerRepresentable: UIViewControllerRepresentable {
                 endRhymeTailLength = next
             }
         }
+        vc.onSetSectionOverride = { anchor, bars in
+            onSetSectionOverride?(anchor, bars)
+        }
         return vc
     }
 
@@ -56,6 +62,7 @@ struct EditorTextViewControllerRepresentable: UIViewControllerRepresentable {
             isLoadingSuggestions: isLoadingSuggestions,
             barPosition: barPosition,
             endRhymeTailLength: endRhymeTailLength,
+            sectionBrackets: sectionBrackets,
             preferredColorScheme: preferredColorScheme,
             preferredTextColor: preferredTextColor,
             preferredTintColor: preferredTintColor
