@@ -10,6 +10,7 @@ struct EditorTextViewControllerRepresentable: UIViewControllerRepresentable {
     var highlights: [TextHighlight]
     var suggestions: [String]
     var isLoadingSuggestions: Bool
+    var barPosition: BarPosition?
     var onSuggestionAccepted: ((String) -> Void)?
 
     var preferredColorScheme: ColorScheme? = nil
@@ -47,6 +48,7 @@ struct EditorTextViewControllerRepresentable: UIViewControllerRepresentable {
             highlights: highlights,
             suggestions: suggestions,
             isLoadingSuggestions: isLoadingSuggestions,
+            barPosition: barPosition,
             preferredColorScheme: preferredColorScheme,
             preferredTextColor: preferredTextColor,
             preferredTintColor: preferredTintColor

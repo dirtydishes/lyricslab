@@ -3,11 +3,18 @@ import SwiftUI
 struct EditorSuggestionsBar: View {
     var suggestions: [String]
     var isLoading: Bool = false
+    var barPosition: BarPosition? = nil
     var onInsert: (String) -> Void
 
     var body: some View {
         VStack(spacing: 0) {
             Divider()
+
+            if let barPosition {
+                BarRulerView(barPosition: barPosition)
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 8)
+            }
             ScrollView(.horizontal, showsIndicators: false) {
                 LazyHStack(spacing: 10) {
                     if suggestions.isEmpty {
@@ -52,9 +59,43 @@ struct EditorSuggestionsBar: View {
     }
 }
 
+private struct BarRulerView: View {
+    var barPosition: BarPosition
+
+    var body: some View {
+        HStack(spacing: 10) {
+            HStack(spacing: 4) {
+                ForEach(0..<16, id: \.self) { idx in
+                    Capsule(style: .continuous)
+                        .fill(idx == barPosition.step ? Color.primary.opacity(0.70) : Color.primary.opacity(0.18))
+                        .frame(width: 10, height: 4)
+                }
+            }
+
+            Spacer(minLength: 6)
+
+            Text("\(barPosition.syllablesBeforeCaret)/\(barPosition.totalSyllables)")
+                .font(.caption.monospacedDigit())
+                .foregroundStyle(.secondary)
+
+            if barPosition.lowConfidenceTokenCount > 0 {
+                Text("est")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(.secondary)
+            }
+        }
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("Bar position")
+        .accessibilityValue("Step \(barPosition.step + 1) of 16")
+    }
+}
+
 struct EditorSuggestionsBar_Previews: PreviewProvider {
     static var previews: some View {
-        EditorSuggestionsBar(suggestions: ["time", "rhyme", "shine", "line"]) { _ in }
+        EditorSuggestionsBar(
+            suggestions: ["time", "rhyme", "shine", "line"],
+            barPosition: BarPosition(step: 6, syllablesBeforeCaret: 7, totalSyllables: 15, lowConfidenceTokenCount: 1)
+        ) { _ in }
             .previewLayout(.sizeThatFits)
     }
 }

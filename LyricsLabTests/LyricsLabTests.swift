@@ -10,7 +10,8 @@ struct RhymeEngineTests {
             wordToRhymeKeys: index.wordToKeys,
             rhymeKeyToWords: index.keyToWords,
             vowelGroupToKeys: index.vowelGroupToKeys,
-            vowelGroupConsonantClassToKeys: index.vowelGroupConsonantClassToKeys
+            vowelGroupConsonantClassToKeys: index.vowelGroupConsonantClassToKeys,
+            wordToSyllableCount: index.wordToSyllables
         )
     }
 
@@ -45,6 +46,7 @@ struct RhymeEngineTests {
         #expect(index.keyToWords["AY1 M"]?.contains("rhyme") == true)
         #expect(index.vowelGroupToKeys["diphthong"]?.contains("AY1 M") == true)
         #expect(index.vowelGroupConsonantClassToKeys["diphthong|nasal"]?.contains("AY1 M") == true)
+        #expect(index.wordToSyllables["time"] == 1)
     }
 
     @Test func nearRhymeSimilarityTreatsNasalEndingsAsNear() async throws {

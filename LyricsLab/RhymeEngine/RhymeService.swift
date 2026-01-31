@@ -18,7 +18,8 @@ actor RhymeService {
                     wordToRhymeKeys: cached.wordToKeys,
                     rhymeKeyToWords: cached.keyToWords,
                     vowelGroupToKeys: cached.vowelGroupToKeys,
-                    vowelGroupConsonantClassToKeys: cached.vowelGroupConsonantClassToKeys
+                    vowelGroupConsonantClassToKeys: cached.vowelGroupConsonantClassToKeys,
+                    wordToSyllableCount: cached.wordToSyllables
                 )
             }
 
@@ -29,9 +30,38 @@ actor RhymeService {
                 wordToRhymeKeys: index.wordToKeys,
                 rhymeKeyToWords: index.keyToWords,
                 vowelGroupToKeys: index.vowelGroupToKeys,
-                vowelGroupConsonantClassToKeys: index.vowelGroupConsonantClassToKeys
+                vowelGroupConsonantClassToKeys: index.vowelGroupConsonantClassToKeys,
+                wordToSyllableCount: index.wordToSyllables
             )
         }
+    }
+
+    func editorAssist(
+        text: String,
+        cursorLocation: Int,
+        userLexicon: [UserLexiconItem],
+        maxCount: Int = 12
+    ) async -> RhymeEditorAssistResult {
+        let dict = await dictionaryTask.value
+        hasLoadedDictionary = true
+
+        let targetKey = inferTargetKey(text: text, cursorLocation: cursorLocation, dictionary: dict)
+        let suggestions: [String]
+        if let targetKey {
+            suggestions = makeSuggestions(
+                targetKey: targetKey,
+                text: text,
+                cursorLocation: cursorLocation,
+                userLexicon: userLexicon,
+                maxSuggestions: maxCount,
+                dictionary: dict
+            )
+        } else {
+            suggestions = []
+        }
+
+        let barPosition = computeBarPosition(text: text, cursorLocation: cursorLocation, dictionary: dict)
+        return RhymeEditorAssistResult(suggestions: suggestions, barPosition: barPosition)
     }
 
     func warmUp() async {
@@ -55,21 +85,8 @@ actor RhymeService {
         userLexicon: [UserLexiconItem],
         maxCount: Int = 12
     ) async -> [String] {
-        let dict = await dictionaryTask.value
-        hasLoadedDictionary = true
-
-        guard let targetKey = inferTargetKey(text: text, cursorLocation: cursorLocation, dictionary: dict) else {
-            return []
-        }
-
-        return makeSuggestions(
-            targetKey: targetKey,
-            text: text,
-            cursorLocation: cursorLocation,
-            userLexicon: userLexicon,
-            maxSuggestions: maxCount,
-            dictionary: dict
-        )
+        let result = await editorAssist(text: text, cursorLocation: cursorLocation, userLexicon: userLexicon, maxCount: maxCount)
+        return result.suggestions
     }
 
     func suggestions(text: String, cursorLocation: Int, maxCount: Int = 12) async -> [String] {
@@ -328,5 +345,59 @@ actor RhymeService {
             }
         }
         return out
+    }
+
+    private func computeBarPosition(text: String, cursorLocation: Int, dictionary: CMUDictionary) -> BarPosition? {
+        let ns = text as NSString
+        let fullRange = NSRange(location: 0, length: ns.length)
+        guard fullRange.length > 0 else { return nil }
+
+        let clamped = max(0, min(cursorLocation, ns.length))
+
+        var lineRangeAtCursor: NSRange?
+        ns.enumerateSubstrings(in: fullRange, options: [.byLines, .substringNotRequired]) { _, lineRange, _, stop in
+            if NSLocationInRange(clamped, lineRange) || (clamped == ns.length && NSMaxRange(lineRange) == ns.length) {
+                lineRangeAtCursor = lineRange
+                stop.pointee = true
+            }
+        }
+
+        guard let lineRange = lineRangeAtCursor else { return nil }
+        let lineText = ns.substring(with: lineRange)
+        let lineNS = lineText as NSString
+
+        let cursorInLine = max(0, min(clamped - lineRange.location, lineNS.length))
+
+        let tokens = LyricsTokenizer.tokenize(lineText)
+        guard !tokens.isEmpty else { return nil }
+
+        let engine = SyllableEngine(dictionary: dictionary)
+        var syllablesBefore = 0
+        var total = 0
+        var lowConfidence = 0
+
+        for t in tokens {
+            guard let res = engine.syllableCount(forToken: t.raw) else { continue }
+            total += res.count
+            if res.confidence < 0.99 {
+                lowConfidence += 1
+            }
+            if NSMaxRange(t.rangeInString) <= cursorInLine {
+                syllablesBefore += res.count
+            }
+        }
+
+        guard total > 0 else { return nil }
+
+        let pos = Double(syllablesBefore) / Double(max(1, total))
+        let rawStep = Int((pos * 16.0).rounded())
+        let step = min(15, max(0, rawStep))
+
+        return BarPosition(
+            step: step,
+            syllablesBeforeCaret: syllablesBefore,
+            totalSyllables: total,
+            lowConfidenceTokenCount: lowConfidence
+        )
     }
 }
