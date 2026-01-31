@@ -148,6 +148,25 @@ CMU entries map word → one or more pronunciations (phoneme arrays).
   - Handle apostrophes (e.g. “don’t”)
   - Simple stemming optional (future)
 
+### 4.2.1 Tokenization + normalization (rap-friendly, MVP+)
+- Tokenization:
+  - Split hyphenated tokens (e.g. "late-night") for lookup.
+  - Treat common rap tokens as first-class (numbers like "24/7", "808", "9mm"; hashtags; apostrophe drops like "gon'").
+- Add a small normalization map *for lookup only* (keep original display text):
+  - `runnin` -> `running`, `nothin` -> `nothing`, `gon`/`gon'` -> `gonna`, `'cause` -> `because`
+- Highlighting can be conservative (skip unknown/weird tokens); suggestions should be aggressive (try multiple normalizations).
+
+### 4.2.2 Multi-syllable rhyme tails (post-MVP, rap-first)
+- Keep baseline: last stressed vowel nucleus -> end.
+- Add optional `tail2`/`tail3`/`tail4` keys (last K vowel nuclei + codas) for punchier rap rhymes.
+- Add a user toggle for end-rhyme targeting: `1-syllable` vs `2-syllable` (default TBD).
+- Consider using the selected tail length for scheme letters + suggestions even if highlighting starts with tail1.
+
+### 4.2.3 Phrase-end rhymes (multiword, post-MVP)
+- For line ends, consider building a rhyme tail from the last N tokens (N=1..4), skipping ad-libs/fillers.
+- Stage 1: use phrase tails for scheme inference / targeting only.
+- Stage 2: optional phrase suggestions in a separate lane once phoneme->range mapping is solid.
+
 ### 4.3 Internal rhyme detection (MVP, cross-line up to 4 lines)
 Definition (MVP):
 - Detect rhyming words that occur inside lines and connect them across nearby lines, using a maximum span of 4 lines (current line ± 3).
@@ -180,6 +199,11 @@ UI treatment:
 - Compute similarity between rhyme keys:
   - Compare last vowel phoneme class + ending consonant cluster similarity.
   - Provide threshold-based grouping.
+- Add a near-rhyme mode used by both highlighting + suggestions:
+  - `Strict` (exact only)
+  - `Rap` (exact + curated near; default TBD)
+  - `Wild` (assonance + consonance)
+- Penalize stress mismatch for near rhymes to reduce false positives.
 
 Output:
 - `RhymeGroup { id, type: end/internal/near, key, colorIndex, occurrences[] }`
@@ -189,6 +213,16 @@ Output:
 - Colors:
   - Palette derived from theme accent + complementary tones.
   - Ensure readability (contrast).
+- Highlight policy (avoid confetti):
+  - Do not highlight singletons (group size must be >= 2).
+  - Keep near rhymes opt-in or lower emphasis than exact.
+- Stable color assignment:
+  - Same rhyme family keeps the same color across edits (deterministic group IDs + colorIndex).
+  - Only assign a new palette color when a genuinely new family appears.
+- Practical highlight modes (persist per-song):
+  - `End Only`
+  - `End + Internal` (default TBD)
+  - `End + Internal + Near`
 - Implementation options:
   1) **AttributedString + TextEditor replacement** (hard in pure SwiftUI; fragile for caret + scroll).
   2) A UIKit editor host (recommended for MVP + "bulletproof" feel):
@@ -242,6 +276,78 @@ Suggestion insertion mechanics (MVP):
 - If there is a selection, replace it.
 - If there's active IME composition (`markedTextRange != nil`), do not force insertion/selection changes mid-composition.
 - After insertion, ensure caret visibility (generally non-animated) without fighting intentional user scrolling.
+
+### 4.5.1 Suggestion ranking pipeline (MVP+, debuggable)
+Candidate generation (high recall, cheap):
+- Exact rhymes: `rhymeKey -> [word]`
+- Near rhymes: union of nearby keys (mode-controlled)
+- Merge user lexicon candidates (global + per-song)
+- Optional (post-MVP): API augmentation for OOV/meaning-related candidates
+
+Feature scoring (mid cost):
+- `rhymeScore` (0..1) as a hard gate
+- `frequencyScore` (avoid obscure)
+- `personalScore` (boost words the user accepts/uses)
+- `fitScore` (basic "does this fit here" heuristics; start simple)
+- `contextScore` (optional; semantic relatedness)
+- `recencyPenalty` (avoid repeats)
+
+Default scoring (start simple and tune with real stanzas):
+```text
+score = 0.45*rhymeScore
+      + 0.20*fitScore
+      + 0.15*contextScore
+      + 0.10*personalScore
+      + 0.10*frequencyScore
+      - 0.25*recencyPenalty
+```
+
+Diversity + stability (top-K only):
+- Cap 1-2 per lemma family and 1-2 per rhymeKey bucket.
+- Optional: MMR-style reranking for the final 12.
+- Cache suggestions by `(targetKey, mode, stanzaHash)` and add hysteresis so the list doesn’t shuffle on every keystroke.
+
+### 4.5.2 Context scoring (post-MVP)
+- Offline-first: `NLEmbedding`-based similarity using keywords from the last 1-4 lines (stopword-filtered).
+- Optional online augmentation (paid): Datamuse / RhymeBrain (cache results; handle attribution + rate limits).
+
+### 4.6 User dictionary + personalization (MVP+)
+Two-layer model (merge at query time):
+- Global user lexicon:
+  - preferred casing, tags/topics
+  - accept count + last used
+  - syllable override
+  - pronunciation override (ARPAbet tail or full pronunciation)
+- Per-song lexicon:
+  - auto-collected from the current song (frequent tokens, named entities)
+  - user can pin words/phrases
+
+Implementation note:
+- Expose a single `Lexicon` interface used by both:
+  - rhyme lookup/normalization
+  - suggestion candidate generation + `personalScore`
+- UI escape hatch: tap a word -> "Sound" sheet to override syllables/pronunciation.
+
+### 4.7 Syllable counting + caret position inside a bar (post-MVP)
+- Primary syllable source: CMUdict pronunciation (count vowel phonemes).
+- Fallback: heuristic syllable estimate (mark low confidence; allow overrides).
+- Baseline bar model: 1 text line == 1 bar (common in rap writing). Later: allow 2 lines per bar or explicit bar markers.
+- Caret -> syllable index:
+  - tokenize bar with character ranges
+  - sum syllables before caret, snapping to token boundaries to avoid jitter
+- Map to a 16-step grid and render a subtle per-line bar ruler + current caret step highlight.
+
+### 4.8 Recognizing 4/8 bar sections (post-MVP)
+- Split into stanzas by blank lines (already a strong signal).
+- Estimate bars per stanza (baseline: line count), optionally adjusted by syllable consistency.
+- Snap and label when near {4, 8, 12, 16} within a tolerance band.
+- UI: show a gutter bracket (e.g. "8 bars") with a quick tap override to lock it.
+
+### 4.9 Hip-hop lyric optimization metrics (post-MVP)
+- Rhyme density: rhyming syllables per bar/line.
+- Multi-syllable strength: show when end rhymes match on 2-3 syllables.
+- Repetition management: detect repeated end words; suggest synonyms that preserve the rhyme tail.
+- Flow/stress alignment (optional): use stress patterns to estimate beat placement; present as a "flow grid" (not judgment).
 
 ---
 
@@ -385,7 +491,7 @@ UI principles (avoid clutter):
 - Highlighting updates as text changes (debounced).
 
 ### Milestone 4 — Near rhyme + suggestions bar
-- Implement near rhyme similarity heuristic.
+- Implement near rhyme similarity heuristic (mode-controlled: `Strict` / `Rap` / `Wild`).
 - Suggestions bar above keyboard:
   - Horizontal scroll
   - Ranked suggestions
@@ -438,6 +544,23 @@ UI principles (avoid clutter):
 - Locked features show paywall.
 - Bypass unlocks without StoreKit.
 
+### Milestone 10 — Rap/flow writing tools (post-MVP, phased)
+- Phase 1: Suggestions feel personal
+  - Global + per-song lexicon, `personalScore`, recency/diversity, hysteresis + caching.
+- Phase 2: Syllables + bar ruler
+  - `SyllableEngine` + caret-to-step mapping, low-confidence cues + overrides.
+- Phase 3: Multi-syllable rhyme keys
+  - `tail2`/`tail3` keys + end-rhyme target toggle; scheme uses selected tail.
+- Phase 4: Context-aware ranking (offline)
+  - `NLEmbedding` context scoring; keep rhymeScore as a hard gate.
+- Phase 5: Section detection
+  - 4/8 bar brackets with quick user overrides.
+
+**Acceptance:**
+- Suggestions reflect the user's vocabulary and remain stable while typing.
+- Bar ruler/caret step is deterministic and doesn’t jitter.
+- Multi-syllable rhyme mode noticeably improves rap end rhymes.
+
 ---
 
 ## 11) Key performance considerations
@@ -446,6 +569,10 @@ UI principles (avoid clutter):
 - Parse CMU dict once; cache parsed output.
 - Highlight updates should touch only changed ranges when possible (optimize later), and must avoid full `textView.text` resets.
 - Gate highlight application while the user is actively scrolling/decelerating to avoid visible jitter.
+- Suggestion ranking should be stable:
+  - cache by `(targetKey, mode, stanzaHash)`
+  - add hysteresis to avoid reshuffling on small score changes
+- Keep candidate generation near O(1) using indexes (`rhymeKey -> [word]`, optional `tail2Key -> [word]`).
 - Avoid heavy blur layers in scrolling lists and the editor background.
 - Use Instruments early (Time Profiler, Allocations).
 
@@ -458,6 +585,12 @@ UI principles (avoid clutter):
 4) Text editor implementation details:
    - `UIViewControllerRepresentable` editor host: caret visibility policy, scroll stability, insertion mechanics, undo/redo.
 5) Highlight palette rules per theme to guarantee accessibility contrast.
+6) Tokenization + normalization map scope (hyphens, numbers, slang spellings) and how conservative highlighting should be vs suggestions.
+7) Multi-syllable rhyme tail length (tail2/tail3/tail4) and the default end-rhyme target toggle.
+8) Bar model choice for the editor (1 line == 1 bar vs 2 lines == 1 bar vs explicit markers) and per-song overrides.
+9) Personalization storage choice (SwiftData vs file-backed) and privacy posture (no lyric content logging).
+10) Context scoring approach (simple n-grams vs `NLEmbedding`) and when to keep it post-MVP.
+
 
 ---
 
