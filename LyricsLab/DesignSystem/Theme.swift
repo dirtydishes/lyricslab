@@ -5,6 +5,7 @@ enum ThemeID: String, CaseIterable, Identifiable {
     case plainLight
     case plainDark
     case dirtyDishes
+    case davyDollas
 
     var id: String { rawValue }
 }
@@ -122,6 +123,40 @@ extension AppTheme {
                     Color(red: 0.38, green: 0.76, blue: 0.98),
                     Color(red: 0.98, green: 0.55, blue: 0.37),
                     Color(red: 0.96, green: 0.46, blue: 0.82),
+                ]
+            )
+
+        case .davyDollas:
+            // Davy Dolla$ - money-green primary, gold accents.
+            // Keep it bold but readable.
+            return AppTheme(
+                id: id,
+                displayName: "Davy Dolla$",
+                colorScheme: .light,
+
+                // "Dollar bill" paper greens.
+                backgroundTop: Color(red: 0.84, green: 0.97, blue: 0.80),
+                backgroundBottom: Color(red: 0.62, green: 0.86, blue: 0.60),
+
+                // Paper surfaces with a green tint.
+                surface: Color(red: 0.98, green: 0.995, blue: 0.98).opacity(0.92),
+                elevatedSurface: Color(red: 0.995, green: 1.0, blue: 0.995).opacity(0.96),
+
+                // Ink-like dark green.
+                textPrimary: Color(red: 0.04, green: 0.16, blue: 0.11),
+                textSecondary: Color(red: 0.07, green: 0.22, blue: 0.15).opacity(0.72),
+
+                // Gold/yellow accents (toggles, highlights) per request.
+                accent: Color(red: 0.86, green: 0.70, blue: 0.12),
+
+                // Rhyme palette: cash-gold + ink + fresh greens.
+                highlightPalette: [
+                    Color(red: 0.86, green: 0.70, blue: 0.12),
+                    Color(red: 0.12, green: 0.46, blue: 0.28),
+                    Color(red: 0.20, green: 0.62, blue: 0.36),
+                    Color(red: 0.04, green: 0.16, blue: 0.11),
+                    Color(red: 0.32, green: 0.74, blue: 0.46),
+                    Color(red: 0.34, green: 0.66, blue: 0.56),
                 ]
             )
         }

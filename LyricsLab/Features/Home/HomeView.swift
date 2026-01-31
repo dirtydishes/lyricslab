@@ -1,6 +1,10 @@
 import SwiftUI
 import SwiftData
 
+#if canImport(UIKit)
+import UIKit
+#endif
+
 struct HomeView: View {
     @Environment(\.modelContext) private var modelContext
     @Query(sort: \Composition.updatedAt, order: .reverse) private var compositions: [Composition]
@@ -21,6 +25,8 @@ struct HomeView: View {
     }
 
     var body: some View {
+        let isDavyDollas = themeManager.themeID == .davyDollas
+
         NavigationStack {
             ZStack {
                 themeManager.theme.backgroundGradient
@@ -39,7 +45,7 @@ struct HomeView: View {
                 }
                 .scrollContentBackground(.hidden)
             }
-            .navigationTitle("LyricsLab")
+            .navigationTitle(isDavyDollas ? "" : "LyricsLab")
             .searchable(text: $searchText)
             .onAppear {
                 debouncedSearchText = searchText
@@ -60,6 +66,12 @@ struct HomeView: View {
                 searchDebounceTask = nil
             }
             .toolbar {
+                if isDavyDollas {
+                    ToolbarItem(placement: .principal) {
+                        DavyDollasTitleView()
+                    }
+                }
+
                 ToolbarItem(placement: .topBarLeading) {
                     Button {
                         withAnimation(.spring(response: 0.35, dampingFraction: 0.65)) {
@@ -118,6 +130,29 @@ struct HomeView: View {
             guard items.indices.contains(index) else { continue }
             modelContext.delete(items[index])
         }
+    }
+}
+
+private struct DavyDollasTitleView: View {
+    private var titleFont: Font {
+        #if canImport(UIKit)
+        if UIFont(name: "Copperplate-Bold", size: 22) != nil {
+            return .custom("Copperplate-Bold", size: 22)
+        }
+        if UIFont(name: "Copperplate", size: 22) != nil {
+            return .custom("Copperplate", size: 22)
+        }
+        #endif
+
+        return .system(.title2, design: .serif).weight(.black)
+    }
+
+    var body: some View {
+        Text("Lyric$Lab")
+            .font(titleFont)
+            .tracking(1.0)
+            .shadow(color: Color.black.opacity(0.55), radius: 6, x: 0, y: 2)
+            .accessibilityLabel("Lyric$Lab")
     }
 }
 

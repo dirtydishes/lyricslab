@@ -53,7 +53,8 @@ struct SettingsView: View {
         .alert("Restart Required", isPresented: $showingRestartAlert) {
             Button("OK") {}
         } message: {
-            Text("Restart LyricsLab to apply your iCloud Sync setting.")
+            let appName = themeManager.themeID == .davyDollas ? "Lyric$Lab" : "LyricsLab"
+            Text("Restart \(appName) to apply your iCloud Sync setting.")
         }
     }
 }
