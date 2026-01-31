@@ -29,6 +29,17 @@ struct RhymeEngineTests {
         #expect(sig?.vowelBase == "IH")
     }
 
+    @Test func contextKeywordsIgnoreStopwords() async throws {
+        let text = "I got money on my mind\nMoney and cars on the street\n"
+        let cursor = (text as NSString).length
+        let keywords = ContextScorer.keywords(text: text, cursorLocation: cursor, maxLines: 4)
+        #expect(keywords.contains("money") == true)
+        #expect(keywords.contains("street") == true)
+        #expect(keywords.contains("cars") == true)
+        #expect(keywords.contains("the") == false)
+        #expect(keywords.contains("and") == false)
+    }
+
     @Test func bundledCMUDictExistsInAppBundle() async throws {
         let bundle = Bundle(for: CMUDictionary.self)
         let candidates = ["cmudict", "cmudict-0.7b"]
