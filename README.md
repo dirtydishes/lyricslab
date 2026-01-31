@@ -7,7 +7,7 @@
 <span style="color: #b45cff;">      /____/                                     </span>
 </pre>
 
-# LyricsLab (Lyric$Lab)
+# LyricsLab
 
 I'm a musical artist, and for a decade I've been unsatisfied with every single songwriting tool I've found.
 So I'm building the app I always wanted: a fast, offline-first writing workspace for hip hop artists and songwriters.
