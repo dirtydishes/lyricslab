@@ -8,7 +8,7 @@
 - SwiftUI-only UI (no UIKit view controllers; UIKit wrappers allowed only when strictly necessary, e.g. advanced text editing).
 - Home view: compositions list + search that matches **titles and lyrics**.
 - Editor view: title field at top, lyrics text editor, rhyme grouping + highlighting (end rhymes + near rhymes) using local `cmudict.txt`.
-- Keyboard accessory bar: horizontally scrolling rhyme suggestions based on current line/rhyme scheme.
+- Suggestions bar above keyboard: horizontally scrolling rhyme suggestions based on current line/rhyme scheme.
 - Settings: spinning gear button on main view → settings screen.
 - iCloud sync option (enabled by default).
 - App is responsive, optimized, and stable.
@@ -85,17 +85,18 @@ Use **SwiftData** (preferred) or **Core Data** if needed for CloudKit flexibilit
 ### 2.2 Editor (Lyrics writing)
 Layout:
 - Title input at top (single-line, prominent).
-- Lyrics editor body (multi-line).
-- Rhyme highlighting overlay (end rhymes + near rhymes).
+- Lyrics editor body (multi-line, `UITextView`-backed for cursor + styling reliability).
+- Rhyme highlighting overlay (end rhymes + near rhymes) that preserves selection + scroll stability.
 - Top-right: music player button (MVP: local files only; advanced later).
 - Bottom mini-player bar appears when track playing:
   - Track name + artist (if available)
   - Animated visualizer
   - Tap to expand player (future)
-- Above keyboard: suggestions bar
+- Above keyboard: suggestions bar (pinned above the keyboard via `UIKeyboardLayoutGuide`, not `inputAccessoryView`)
   - Horizontal scroll
   - Shows rhyme-matching words prioritized by relevance
-  - Tap inserts word at cursor (or appends if cursor unknown)
+  - Tap inserts `word` + exactly one trailing space at the caret/selection; caret remains visible afterward
+  - Avoid interfering with IME composition (respect `markedTextRange`)
 
 **Reference inspiration:** “Rhymers Block” for the rhyme/suggestion feel, but maintain LyricsLab’s retro-futuristic baseline aesthetic and “liquid glass” polish.
 
@@ -189,15 +190,30 @@ Output:
   - Palette derived from theme accent + complementary tones.
   - Ensure readability (contrast).
 - Implementation options:
-  1) **AttributedString + TextEditor replacement** (hard in pure SwiftUI).
-  2) A custom text view wrapper (UIKit `UITextView`) for attributed text editing (recommended for MVP feasibility).
-     - Still keep the app UI SwiftUI; only the editor control is wrapped.
+  1) **AttributedString + TextEditor replacement** (hard in pure SwiftUI; fragile for caret + scroll).
+  2) A UIKit editor host (recommended for MVP + "bulletproof" feel):
+     - `UIViewControllerRepresentable` wrapper owns:
+       - `UITextView` (scrolling + selection source of truth while editing)
+       - Suggestions bar pinned above keyboard using `view.keyboardLayoutGuide`
+       - A `UIHostingController` that hosts the SwiftUI `EditorSuggestionsBar`
      - Enables:
-       - Accurate cursor insertion
-       - Per-range highlighting
-       - Underlines / backgrounds for rhyme groups
+       - Accurate cursor insertion at caret/selection
+       - Per-range highlighting (underline/background)
+       - Reliable caret visibility (no hiding under keyboard/suggestions bar)
+       - Interactive keyboard dismissal that feels native
 
-**Decision:** Use a `UITextView` wrapper early to avoid fighting SwiftUI `TextEditor` limitations.
+**Decision:** Use a `UIViewControllerRepresentable` editor controller early (UITextView + pinned suggestions bar via `UIKeyboardLayoutGuide`) to avoid `TextEditor` limitations and reduce scroll/caret fragility.
+
+### 4.4.1 "Bulletproof" scrolling + caret invariants (MVP)
+Product invariants (editor must feel top-tier):
+- Caret stays visible when typing and after suggestion insertion (with a small vertical breathing room).
+- Applying highlights must not jump scroll position.
+- If the user intentionally scrolls away from the caret, do not yank them back unless they perform an explicit "return to editing" action (typing, tapping a suggestion, tapping into the editor).
+
+Implementation rules of thumb:
+- Avoid `textView.text = ...` for suggestion insertion or highlight passes; use `textStorage.replaceCharacters` (or `UITextInput` replacement) and preserve selection explicitly.
+- During active editing, treat the `UITextView` as the source of truth; SwiftUI receives updates but should not continuously push full text back into the view.
+- Gate caret auto-scrolling during highlight updates if the user is actively scrolling/decelerating.
 
 ### 4.5 Suggestions engine (MVP)
 Inputs:
@@ -210,7 +226,7 @@ Outputs:
   - User vocabulary personalization (future: learn from user’s lyrics)
 
 UI:
-- Keyboard accessory bar with horizontal chips:
+- Suggestions bar above keyboard with horizontal chips:
   - Word chip tap → insert
   - Long press → preview alternatives / pronunciation (future)
 
@@ -220,6 +236,12 @@ Internal rhyme interaction (MVP behavior):
 
 Cross-line behavior:
 - Prioritize suggestions matching the most recently active rhyme group within the last 4 lines.
+
+Suggestion insertion mechanics (MVP):
+- Tap suggestion inserts `word` + one trailing space (no double spaces).
+- If there is a selection, replace it.
+- If there's active IME composition (`markedTextRange != nil`), do not force insertion/selection changes mid-composition.
+- After insertion, ensure caret visibility (generally non-animated) without fighting intentional user scrolling.
 
 ---
 
@@ -336,11 +358,18 @@ UI principles (avoid clutter):
 - UI is smooth.
 
 ### Milestone 2 — Editor control (robust text editing)
-- Implement `UITextView` SwiftUI wrapper:
-  - Bind to lyrics string
-  - Maintain cursor position
-  - Provide insertion API for suggestion chips
+- Implement a UIKit-backed editor using `UIViewControllerRepresentable`:
+  - Controller owns `UITextView` + pinned suggestions bar (via `UIKeyboardLayoutGuide`)
+  - Keep `UITextView` as the source of truth during active editing to avoid SwiftUI feedback loops
+  - Provide insertion API for suggestion chips (no full-text replacement; preserve undo + selection)
+  - Ensure caret visibility policy (typing + insertion) without yanking user scroll position while reading
 - Title field at top.
+- Likely implementation files:
+  - Add `LyricsLab/Features/Editor/EditorTextViewController.swift`
+  - Add `LyricsLab/Features/Editor/EditorTextViewControllerRepresentable.swift`
+  - Update `LyricsLab/Features/Editor/EditorView.swift` to use the controller-backed editor
+  - Keep `LyricsLab/Features/Editor/EditorSuggestionsBar.swift` (hosted inside the controller via `UIHostingController`)
+  - Reduce/replace `LyricsLab/Features/Editor/LyricsTextView.swift` (inputAccessory-based approach)
 
 **Acceptance:**
 - Typing feels native, no lag.
@@ -357,7 +386,7 @@ UI principles (avoid clutter):
 
 ### Milestone 4 — Near rhyme + suggestions bar
 - Implement near rhyme similarity heuristic.
-- Keyboard accessory bar:
+- Suggestions bar above keyboard:
   - Horizontal scroll
   - Ranked suggestions
 - Rhyme scheme heuristics (simple):
@@ -415,7 +444,8 @@ UI principles (avoid clutter):
 - Debounce expensive operations:
   - Rhyme analysis after typing pauses (e.g. 250–400ms).
 - Parse CMU dict once; cache parsed output.
-- Highlight updates should touch only changed ranges when possible (optimize later).
+- Highlight updates should touch only changed ranges when possible (optimize later), and must avoid full `textView.text` resets.
+- Gate highlight application while the user is actively scrolling/decelerating to avoid visible jitter.
 - Avoid heavy blur layers in scrolling lists and the editor background.
 - Use Instruments early (Time Profiler, Allocations).
 
@@ -426,7 +456,7 @@ UI principles (avoid clutter):
 2) Exact rhyme heuristic: last stressed vowel → end (standard) vs alternative.
 3) Near rhyme similarity method + thresholds (tune with test lyrics).
 4) Text editor implementation details:
-   - `UITextView` wrapper API for ranges, attributes, insertion, undo/redo.
+   - `UIViewControllerRepresentable` editor host: caret visibility policy, scroll stability, insertion mechanics, undo/redo.
 5) Highlight palette rules per theme to guarantee accessibility contrast.
 
 ---
