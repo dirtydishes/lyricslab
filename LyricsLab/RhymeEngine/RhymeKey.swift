@@ -23,6 +23,22 @@ nonisolated enum RhymeKey {
         return tail.isEmpty ? nil : tail.joined(separator: " ")
     }
 
+    // Multi-syllable tail (last K vowel nuclei + their codas).
+    // - If the word has fewer than K vowel nuclei, returns the longest available tail.
+    // - K must be >= 1.
+    static func tailKey(fromPhonemes phonemes: [String], vowelNucleiCount k: Int) -> String? {
+        guard k >= 1 else { return nil }
+        let segments = syllableSegments(fromPhonemes: phonemes)
+        guard !segments.isEmpty else {
+            return fromPhonemes(phonemes)
+        }
+
+        let useCount = min(k, segments.count)
+        let tailSegments = segments.suffix(useCount)
+        let flattened = tailSegments.flatMap { $0 }
+        return flattened.isEmpty ? nil : flattened.joined(separator: " ")
+    }
+
     // Used for end-rhyme near matching (more permissive).
     static let nearRhymeThreshold: Double = 0.84
     // Used for internal-rhyme near matching (stricter to avoid "confetti").
@@ -32,7 +48,9 @@ nonisolated enum RhymeKey {
         let parts = key.split(separator: " ").map(String.init)
         guard let first = parts.first else { return nil }
 
-        let vowel = stripStressDigit(first)
+        // For multi-syllable tails, the *last* vowel nucleus is the best anchor.
+        let vowelPart = parts.last(where: { $0.last?.isNumber == true }) ?? first
+        let vowel = stripStressDigit(vowelPart)
         let vowelGroup = vowelGroupID(for: vowel)
 
         // Find last consonant-like phoneme in the key (ignores vowels like ER0).
@@ -85,6 +103,36 @@ nonisolated enum RhymeKey {
 
     private static func stripStressDigit(_ phoneme: String) -> String {
         phoneme.trimmingCharacters(in: CharacterSet.decimalDigits)
+    }
+
+    private static func syllableSegments(fromPhonemes phonemes: [String]) -> [[String]] {
+        // Each segment starts at a vowel nucleus (digit-suffixed phoneme) and includes
+        // trailing consonants until the next vowel nucleus.
+        var segments: [[String]] = []
+        segments.reserveCapacity(4)
+
+        var current: [String] = []
+        for p in phonemes {
+            let isVowelNucleus = p.last?.isNumber == true
+            if isVowelNucleus {
+                if !current.isEmpty {
+                    segments.append(current)
+                    current = []
+                }
+                current.append(p)
+            } else {
+                // Only attach consonants after we've seen the first vowel nucleus.
+                if !current.isEmpty {
+                    current.append(p)
+                }
+            }
+        }
+
+        if !current.isEmpty {
+            segments.append(current)
+        }
+
+        return segments
     }
 
     private static func isConsonantPhoneme(_ phoneme: String) -> Bool {

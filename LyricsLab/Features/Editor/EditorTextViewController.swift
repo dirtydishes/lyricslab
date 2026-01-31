@@ -16,6 +16,7 @@ final class EditorTextViewController: UIViewController {
     var onSelectionChanged: ((NSRange) -> Void)?
     var onFocusChanged: ((Bool) -> Void)?
     var onSuggestionAccepted: ((String) -> Void)?
+    var onEndRhymeTailLengthChanged: ((Int) -> Void)?
 
     private(set) var textView = UITextView()
 
@@ -54,6 +55,7 @@ final class EditorTextViewController: UIViewController {
         suggestions: [String],
         isLoadingSuggestions: Bool,
         barPosition: BarPosition?,
+        endRhymeTailLength: Int,
         preferredColorScheme: ColorScheme?,
         preferredTextColor: Color?,
         preferredTintColor: Color?
@@ -62,7 +64,12 @@ final class EditorTextViewController: UIViewController {
         applyTextIfNeeded(text)
         applySelectionIfNeeded(selectedRange)
         applyHighlightsIfNeeded(highlights)
-        updateSuggestionsBar(suggestions: suggestions, isLoading: isLoadingSuggestions, barPosition: barPosition)
+        updateSuggestionsBar(
+            suggestions: suggestions,
+            isLoading: isLoadingSuggestions,
+            barPosition: barPosition,
+            endRhymeTailLength: endRhymeTailLength
+        )
         setSuggestionsVisible(isFocused)
         setFocus(isFocused)
     }
@@ -81,7 +88,15 @@ final class EditorTextViewController: UIViewController {
 
     private func configureSuggestionsBar() {
         let host = UIHostingController(
-            rootView: EditorSuggestionsBar(suggestions: [], isLoading: false, barPosition: nil) { [weak self] word in
+            rootView: EditorSuggestionsBar(
+                suggestions: [],
+                isLoading: false,
+                barPosition: nil,
+                endRhymeTailLength: 1,
+                onSetEndRhymeTailLength: { [weak self] next in
+                    self?.onEndRhymeTailLengthChanged?(next)
+                }
+            ) { [weak self] word in
                 self?.insertSuggestion(word)
             }
         )
@@ -201,9 +216,17 @@ final class EditorTextViewController: UIViewController {
         textView.textStorage.endEditing()
     }
 
-    private func updateSuggestionsBar(suggestions: [String], isLoading: Bool, barPosition: BarPosition?) {
+    private func updateSuggestionsBar(suggestions: [String], isLoading: Bool, barPosition: BarPosition?, endRhymeTailLength: Int) {
         guard let host = suggestionsHostingController else { return }
-        host.rootView = EditorSuggestionsBar(suggestions: suggestions, isLoading: isLoading, barPosition: barPosition) { [weak self] word in
+        host.rootView = EditorSuggestionsBar(
+            suggestions: suggestions,
+            isLoading: isLoading,
+            barPosition: barPosition,
+            endRhymeTailLength: endRhymeTailLength,
+            onSetEndRhymeTailLength: { [weak self] next in
+                self?.onEndRhymeTailLengthChanged?(next)
+            }
+        ) { [weak self] word in
             self?.insertSuggestion(word)
         }
     }

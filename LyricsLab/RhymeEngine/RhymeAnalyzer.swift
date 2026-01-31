@@ -10,6 +10,12 @@ nonisolated enum RhymeAnalyzer {
     }
 
     nonisolated static func analyze(text: String, dictionary: CMUDictionary) -> RhymeAnalysis {
+        analyze(text: text, dictionary: dictionary, endRhymeTailLength: 1)
+    }
+
+    nonisolated static func analyze(text: String, dictionary: CMUDictionary, endRhymeTailLength: Int) -> RhymeAnalysis {
+        let endTailLength = max(1, min(2, endRhymeTailLength))
+
         let ns = text as NSString
         let fullRange = NSRange(location: 0, length: ns.length)
         guard fullRange.length > 0 else { return .empty }
@@ -21,7 +27,7 @@ nonisolated enum RhymeAnalyzer {
         var occurrences: [RhymeOccurrence] = []
         occurrences.reserveCapacity(256)
 
-        var endOccurrences: [RhymeOccurrence] = []
+        var endOccurrences: [(key: String, occ: RhymeOccurrence)] = []
         endOccurrences.reserveCapacity(64)
 
         var lineIndex = 0
@@ -40,18 +46,19 @@ nonisolated enum RhymeAnalyzer {
             for (idx, m) in matches.enumerated() {
                 let isFinalToken = idx == matches.count - 1
                 let word = lineNS.substring(with: m.range)
-                guard let key = dictionary.rhymeKeys(for: word).first else { continue }
+                guard let internalKey = dictionary.rhymeKeys(for: word).first else { continue }
                 let fullTokenRange = NSRange(location: lineRange.location + m.range.location, length: m.range.length)
 
                 let occ = RhymeOccurrence(
                     range: fullTokenRange,
-                    rhymeKey: key,
+                    rhymeKey: internalKey,
                     lineIndex: lineIndex,
                     isLineFinalToken: isFinalToken
                 )
                 lineOccurrences.append(occ)
                 if isFinalToken {
-                    endOccurrences.append(occ)
+                    let endKey = dictionary.rhymeKeys(for: word, tailLength: endTailLength).first ?? internalKey
+                    endOccurrences.append((key: endKey, occ: occ))
                 }
             }
 
@@ -60,7 +67,7 @@ nonisolated enum RhymeAnalyzer {
         }
 
         // 1) End rhyme groups (exact, by line-final tokens only; global).
-        let endByKey = Dictionary(grouping: endOccurrences, by: { $0.rhymeKey })
+        let endByKey = Dictionary(grouping: endOccurrences, by: { $0.key })
         let endKeys = endByKey
             .filter { $0.value.count >= 2 }
             .map { $0.key }
@@ -142,7 +149,7 @@ nonisolated enum RhymeAnalyzer {
         var endGroups: [RhymeGroup] = []
         endGroups.reserveCapacity(endKeys.count)
         for key in orderedExactKeys where endKeys.contains(key) {
-            let occs = (endByKey[key] ?? []).sorted { $0.range.location < $1.range.location }
+            let occs = (endByKey[key] ?? []).map { $0.occ }.sorted { $0.range.location < $1.range.location }
             endGroups.append(RhymeGroup(type: .end, rhymeKey: key, colorIndex: colorIndexByKey[key] ?? 0, occurrences: occs))
         }
         for i in internalGroups.indices {
@@ -250,7 +257,15 @@ nonisolated enum RhymeAnalyzer {
 
     // Simple scheme inference: in the last N lines up to cursor, pick the most recent
     // repeated line-ending rhyme key; otherwise fall back to current line ending.
-    nonisolated static func inferActiveRhymeKey(text: String, cursor: Int, dictionary: CMUDictionary, lookbackLines: Int = 12) -> String? {
+    nonisolated static func inferActiveRhymeKey(
+        text: String,
+        cursor: Int,
+        dictionary: CMUDictionary,
+        lookbackLines: Int = 12,
+        endRhymeTailLength: Int = 1
+    ) -> String? {
+        let endTailLength = max(1, min(2, endRhymeTailLength))
+
         let ns = text as NSString
         let clamped = max(0, min(cursor, ns.length))
         let fullRange = NSRange(location: 0, length: ns.length)
@@ -281,7 +296,7 @@ nonisolated enum RhymeAnalyzer {
             }
 
             let word = lineNS.substring(with: last.range)
-            guard let key = dictionary.rhymeKeys(for: word).first else {
+            guard let key = dictionary.rhymeKeys(for: word, tailLength: endTailLength).first else {
                 lineIndex += 1
                 return
             }

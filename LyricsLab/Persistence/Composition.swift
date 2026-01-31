@@ -16,6 +16,11 @@ final class Composition: Identifiable {
     // Per-song lexicon metadata (pinned words, overrides later).
     var lexiconState: CompositionLexiconState?
 
+    // End-rhyme target strength.
+    // 1 = tail1 (last vowel nucleus), 2 = tail2 (last 2 vowel nuclei), etc.
+    // Default stays conservative for compatibility.
+    var endRhymeTailLength: Int = 1
+
     // A lightweight, denormalized field to make Home search fast.
     // Updated whenever title/lyrics change.
     var searchBlob: String = ""
@@ -27,7 +32,8 @@ final class Composition: Identifiable {
         createdAt: Date = Date(),
         updatedAt: Date = Date(),
         lastOpenedAt: Date? = nil,
-        lexiconState: CompositionLexiconState? = nil
+        lexiconState: CompositionLexiconState? = nil,
+        endRhymeTailLength: Int = 1
     ) {
         self.id = id
         self.title = title
@@ -36,6 +42,7 @@ final class Composition: Identifiable {
         self.updatedAt = updatedAt
         self.lastOpenedAt = lastOpenedAt
         self.lexiconState = lexiconState
+        self.endRhymeTailLength = endRhymeTailLength
         self.searchBlob = Composition.makeSearchBlob(title: title, lyrics: lyrics)
     }
 
