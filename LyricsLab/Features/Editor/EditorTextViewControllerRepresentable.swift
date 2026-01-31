@@ -10,6 +10,7 @@ struct EditorTextViewControllerRepresentable: UIViewControllerRepresentable {
     var highlights: [TextHighlight]
     var suggestions: [String]
     var isLoadingSuggestions: Bool
+    var onSuggestionAccepted: ((String) -> Void)?
 
     var preferredColorScheme: ColorScheme? = nil
     var preferredTextColor: Color? = nil
@@ -31,6 +32,9 @@ struct EditorTextViewControllerRepresentable: UIViewControllerRepresentable {
             if isFocused != focused {
                 isFocused = focused
             }
+        }
+        vc.onSuggestionAccepted = { word in
+            onSuggestionAccepted?(word)
         }
         return vc
     }

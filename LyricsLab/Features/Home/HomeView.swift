@@ -186,7 +186,7 @@ private struct CompositionRow: View {
 struct HomeView_Previews: PreviewProvider {
     static var previews: some View {
         HomeView()
-            .modelContainer(for: Composition.self, inMemory: true)
+            .modelContainer(for: [Composition.self, UserLexiconEntry.self, CompositionLexiconState.self], inMemory: true)
             .environmentObject(ThemeManager())
     }
 }

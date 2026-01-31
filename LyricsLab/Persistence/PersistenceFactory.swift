@@ -5,6 +5,8 @@ enum PersistenceFactory {
     static func makeContainer(iCloudSyncEnabled: Bool) throws -> ModelContainer {
         let schema = Schema([
             Composition.self,
+            UserLexiconEntry.self,
+            CompositionLexiconState.self,
         ])
 
         // When iCloud is enabled, SwiftData will sync automatically if the project

@@ -87,7 +87,7 @@ extension CMUDictionary {
         var vowelGroupToKeys: [String: Set<String>] = [:]
         var vowelGroupConsonantClassToKeys: [String: Set<String>] = [:]
 
-        for rawLine in text.split(whereSeparator: \ .isNewline) {
+        for rawLine in text.split(whereSeparator: \.isNewline) {
             if rawLine.hasPrefix(";;;") {
                 continue
             }

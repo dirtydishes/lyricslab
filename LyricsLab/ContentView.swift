@@ -12,7 +12,7 @@ struct ContentView: View {
 struct ContentView_Previews: PreviewProvider {
     static var previews: some View {
         ContentView()
-            .modelContainer(for: Composition.self, inMemory: true)
+            .modelContainer(for: [Composition.self, UserLexiconEntry.self, CompositionLexiconState.self], inMemory: true)
             .environmentObject(ThemeManager())
     }
 }

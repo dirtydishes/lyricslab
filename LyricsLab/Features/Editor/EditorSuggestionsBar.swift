@@ -23,7 +23,7 @@ struct EditorSuggestionsBar: View {
                         .padding(.horizontal, 14)
                         .padding(.vertical, 10)
                     } else {
-                        ForEach(suggestions, id: \ .self) { word in
+                        ForEach(suggestions, id: \.self) { word in
                             Button {
                                 onInsert(word)
                             } label: {

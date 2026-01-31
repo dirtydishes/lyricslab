@@ -48,6 +48,9 @@ struct EditorView: View {
                     highlights: textHighlights,
                     suggestions: suggestions,
                     isLoadingSuggestions: !rhymeServiceReady,
+                    onSuggestionAccepted: { word in
+                        recordSuggestionAcceptance(word)
+                    },
                     preferredColorScheme: themeManager.theme.colorScheme,
                     preferredTextColor: themeManager.theme.textPrimary,
                     preferredTintColor: themeManager.theme.accent
@@ -68,6 +71,7 @@ struct EditorView: View {
 
                 EditorSuggestionsBar(suggestions: suggestions, isLoading: !rhymeServiceReady) { word in
                     insertSuggestionFallback(word)
+                    recordSuggestionAcceptance(word)
                 }
                 #endif
             }
@@ -77,6 +81,8 @@ struct EditorView: View {
         .onAppear {
             composition.lastOpenedAt = Date()
             isLyricsFocused = true
+
+            ensureCompositionLexiconState()
 
             warmUpTask?.cancel()
             warmUpTask = Task {
@@ -163,10 +169,16 @@ struct EditorView: View {
 
         let textSnapshot = composition.lyrics
         let cursorSnapshot = lyricsSelectedRange.location
+
+        // Snapshot the lexicon on the main actor (SwiftData), then compute suggestions off-main.
+        let lexiconSnapshot = UserLexiconStore.fetchTopUserLexiconItems(in: modelContext, limit: 512)
+
         suggestionsTask = Task {
             let next = await RhymeService.shared.suggestions(
                 text: textSnapshot,
-                cursorLocation: cursorSnapshot
+                cursorLocation: cursorSnapshot,
+                userLexicon: lexiconSnapshot,
+                maxCount: 12
             )
 
             guard !Task.isCancelled else { return }
@@ -175,6 +187,20 @@ struct EditorView: View {
                 rhymeServiceReady = true
             }
         }
+    }
+
+    private func ensureCompositionLexiconState() {
+        guard composition.lexiconState == nil else { return }
+
+        let state = CompositionLexiconState(composition: composition)
+        composition.lexiconState = state
+        modelContext.insert(state)
+        try? modelContext.save()
+    }
+
+    private func recordSuggestionAcceptance(_ word: String) {
+        UserLexiconStore.recordAcceptedWord(word, in: modelContext)
+        try? modelContext.save()
     }
 
     private func insertSuggestionFallback(_ word: String) {
@@ -250,7 +276,7 @@ struct EditorView_Previews: PreviewProvider {
         NavigationStack {
             EditorView(composition: Composition(title: "Draft", lyrics: "Hello\nWorld"))
         }
-        .modelContainer(for: Composition.self, inMemory: true)
+        .modelContainer(for: [Composition.self, UserLexiconEntry.self, CompositionLexiconState.self], inMemory: true)
         .environmentObject(ThemeManager())
     }
 }

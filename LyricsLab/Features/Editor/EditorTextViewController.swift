@@ -15,6 +15,7 @@ final class EditorTextViewController: UIViewController {
     var onTextChanged: ((String) -> Void)?
     var onSelectionChanged: ((NSRange) -> Void)?
     var onFocusChanged: ((Bool) -> Void)?
+    var onSuggestionAccepted: ((String) -> Void)?
 
     private(set) var textView = UITextView()
 
@@ -297,6 +298,7 @@ final class EditorTextViewController: UIViewController {
 
         onTextChanged?(textView.text)
         onSelectionChanged?(textView.selectedRange)
+        onSuggestionAccepted?(word)
 
         ensureCaretVisible(reason: .insertion, animated: false)
     }
