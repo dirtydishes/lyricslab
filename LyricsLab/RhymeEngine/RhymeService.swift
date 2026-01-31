@@ -1,4 +1,5 @@
 import Foundation
+import NaturalLanguage
 
 actor RhymeService {
     static let shared = RhymeService()
@@ -10,7 +11,11 @@ actor RhymeService {
     private var suggestionTick: Int = 0
     private var lastSuggestedTickByWord: [String: Int] = [:]
 
+    private var wordEmbedding: NLEmbedding?
+
     init() {
+        wordEmbedding = NLEmbedding.wordEmbedding(for: .english)
+
         dictionaryTask = Task.detached(priority: .utility) {
             let cached = CMUDictionaryStore.loadCachedIndex()
             if let cached, cached.version == CMUDictionaryIndex.currentVersion {
@@ -158,11 +163,12 @@ actor RhymeService {
             var key: String
             var rhymeScore: Double
             var personalScore: Double
+            var contextScore: Double
             var recencyPenalty: Double
             var usedInTextPenalty: Double
             var qualityScore: Double
 
-            var score: Double {
+            var scoreWithoutContext: Double {
                 // Simple, debuggable scoring. Keep rhyme as the dominant signal.
                 (0.70 * rhymeScore)
                     + (0.22 * personalScore)
@@ -170,10 +176,17 @@ actor RhymeService {
                     - (0.30 * recencyPenalty)
                     - (0.22 * usedInTextPenalty)
             }
+
+            var score: Double {
+                // Context is a soft nudge; rhyme remains the must-have.
+                scoreWithoutContext + (0.12 * contextScore)
+            }
         }
 
         // Words used near the cursor should be down-ranked to reduce repetition.
         let recentWords = recentNormalizedWords(text: text, cursorLocation: cursorLocation, maxLines: 8)
+
+        let contextKeywords = ContextScorer.keywords(text: text, cursorLocation: cursorLocation, maxLines: 4)
 
         suggestionTick &+= 1
         let nowTick = suggestionTick
@@ -227,6 +240,7 @@ actor RhymeService {
                 key: targetKey,
                 rhymeScore: 1.0,
                 personalScore: 0.0,
+                contextScore: 0.0,
                 recencyPenalty: recencyPenalty(forNormalized: normalized),
                 usedInTextPenalty: usedInTextPenalty(forNormalized: normalized),
                 qualityScore: qualityScore(forDisplay: w)
@@ -249,6 +263,7 @@ actor RhymeService {
                     key: k,
                     rhymeScore: sim,
                     personalScore: 0.0,
+                    contextScore: 0.0,
                     recencyPenalty: recencyPenalty(forNormalized: normalized),
                     usedInTextPenalty: usedInTextPenalty(forNormalized: normalized),
                     qualityScore: qualityScore(forDisplay: w)
@@ -299,10 +314,31 @@ actor RhymeService {
                     key: bestKey ?? targetKey,
                     rhymeScore: bestSim,
                     personalScore: personal,
+                    contextScore: 0.0,
                     recencyPenalty: recencyPenalty(forNormalized: normalized),
                     usedInTextPenalty: usedInTextPenalty(forNormalized: normalized),
                     qualityScore: qualityScore(forDisplay: item.display)
                 )
+            }
+        }
+
+        // Context scoring can be moderately expensive; only apply it to the most promising candidates.
+        if let embedding = wordEmbedding, !contextKeywords.isEmpty {
+            let preSorted = candidates.values.sorted { a, b in
+                if a.scoreWithoutContext != b.scoreWithoutContext { return a.scoreWithoutContext > b.scoreWithoutContext }
+                if a.rhymeScore != b.rhymeScore { return a.rhymeScore > b.rhymeScore }
+                if a.personalScore != b.personalScore { return a.personalScore > b.personalScore }
+                return a.display < b.display
+            }
+
+            for c in preSorted.prefix(220) {
+                let score = ContextScorer.contextScore(candidate: c.normalized, keywords: contextKeywords, embedding: embedding)
+                if score <= 0 {
+                    continue
+                }
+                var updated = c
+                updated.contextScore = score
+                candidates[c.normalized] = updated
             }
         }
 
