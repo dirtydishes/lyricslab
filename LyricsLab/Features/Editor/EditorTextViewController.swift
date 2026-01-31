@@ -15,6 +15,7 @@ final class EditorTextViewController: UIViewController {
     var onTextChanged: ((String) -> Void)?
     var onSelectionChanged: ((NSRange) -> Void)?
     var onFocusChanged: ((Bool) -> Void)?
+    var onSuggestionAccepted: ((String) -> Void)?
 
     private(set) var textView = UITextView()
 
@@ -52,6 +53,7 @@ final class EditorTextViewController: UIViewController {
         highlights: [TextHighlight],
         suggestions: [String],
         isLoadingSuggestions: Bool,
+        barPosition: BarPosition?,
         preferredColorScheme: ColorScheme?,
         preferredTextColor: Color?,
         preferredTintColor: Color?
@@ -60,7 +62,7 @@ final class EditorTextViewController: UIViewController {
         applyTextIfNeeded(text)
         applySelectionIfNeeded(selectedRange)
         applyHighlightsIfNeeded(highlights)
-        updateSuggestionsBar(suggestions: suggestions, isLoading: isLoadingSuggestions)
+        updateSuggestionsBar(suggestions: suggestions, isLoading: isLoadingSuggestions, barPosition: barPosition)
         setSuggestionsVisible(isFocused)
         setFocus(isFocused)
     }
@@ -79,7 +81,7 @@ final class EditorTextViewController: UIViewController {
 
     private func configureSuggestionsBar() {
         let host = UIHostingController(
-            rootView: EditorSuggestionsBar(suggestions: [], isLoading: false) { [weak self] word in
+            rootView: EditorSuggestionsBar(suggestions: [], isLoading: false, barPosition: nil) { [weak self] word in
                 self?.insertSuggestion(word)
             }
         )
@@ -199,9 +201,9 @@ final class EditorTextViewController: UIViewController {
         textView.textStorage.endEditing()
     }
 
-    private func updateSuggestionsBar(suggestions: [String], isLoading: Bool) {
+    private func updateSuggestionsBar(suggestions: [String], isLoading: Bool, barPosition: BarPosition?) {
         guard let host = suggestionsHostingController else { return }
-        host.rootView = EditorSuggestionsBar(suggestions: suggestions, isLoading: isLoading) { [weak self] word in
+        host.rootView = EditorSuggestionsBar(suggestions: suggestions, isLoading: isLoading, barPosition: barPosition) { [weak self] word in
             self?.insertSuggestion(word)
         }
     }
@@ -297,6 +299,7 @@ final class EditorTextViewController: UIViewController {
 
         onTextChanged?(textView.text)
         onSelectionChanged?(textView.selectedRange)
+        onSuggestionAccepted?(word)
 
         ensureCaretVisible(reason: .insertion, animated: false)
     }

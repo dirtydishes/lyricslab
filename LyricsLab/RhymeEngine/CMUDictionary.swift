@@ -5,22 +5,30 @@ nonisolated final class CMUDictionary {
     nonisolated private let rhymeKeyToWords: [String: [String]]
     nonisolated private let vowelGroupToKeys: [String: [String]]
     nonisolated private let vowelGroupConsonantClassToKeys: [String: [String]]
+    nonisolated private let wordToSyllableCount: [String: Int]
 
     init(
         wordToRhymeKeys: [String: [String]],
         rhymeKeyToWords: [String: [String]],
         vowelGroupToKeys: [String: [String]],
-        vowelGroupConsonantClassToKeys: [String: [String]]
+        vowelGroupConsonantClassToKeys: [String: [String]],
+        wordToSyllableCount: [String: Int]
     ) {
         self.wordToRhymeKeys = wordToRhymeKeys
         self.rhymeKeyToWords = rhymeKeyToWords
         self.vowelGroupToKeys = vowelGroupToKeys
         self.vowelGroupConsonantClassToKeys = vowelGroupConsonantClassToKeys
+        self.wordToSyllableCount = wordToSyllableCount
     }
 
     nonisolated func rhymeKeys(for rawWord: String) -> [String] {
         let word = Self.normalizeWord(rawWord)
         return wordToRhymeKeys[word] ?? []
+    }
+
+    nonisolated func syllableCount(for rawWord: String) -> Int? {
+        let word = Self.normalizeWord(rawWord)
+        return wordToSyllableCount[word]
     }
 
     nonisolated func words(forRhymeKey key: String) -> [String] {
@@ -86,8 +94,9 @@ extension CMUDictionary {
         var keyToWords: [String: Set<String>] = [:]
         var vowelGroupToKeys: [String: Set<String>] = [:]
         var vowelGroupConsonantClassToKeys: [String: Set<String>] = [:]
+        var wordToSyllables: [String: Set<Int>] = [:]
 
-        for rawLine in text.split(whereSeparator: \ .isNewline) {
+        for rawLine in text.split(whereSeparator: \.isNewline) {
             if rawLine.hasPrefix(";;;") {
                 continue
             }
@@ -107,6 +116,12 @@ extension CMUDictionary {
 
             let phonemes = parts.dropFirst().map { String($0) }
             guard let key = RhymeKey.fromPhonemes(phonemes) else { continue }
+
+            // Syllables = vowel nuclei count, approximated by counting ARPAbet phonemes that carry a stress digit.
+            let syllableCount = phonemes.filter { $0.last?.isNumber == true }.count
+            if syllableCount > 0 {
+                wordToSyllables[word, default: []].insert(syllableCount)
+            }
 
             wordToKeys[word, default: []].insert(key)
             keyToWords[key, default: []].insert(word)
@@ -130,12 +145,18 @@ extension CMUDictionary {
         let normalizedVowelGroupConsonantClassToKeys = vowelGroupConsonantClassToKeys
             .mapValues { Array($0).sorted() }
 
+        let normalizedWordToSyllables: [String: Int] = wordToSyllables.reduce(into: [:]) { out, pair in
+            // Pronunciation variants usually share syllable counts; pick the minimum to avoid over-counting.
+            out[pair.key] = pair.value.min() ?? 0
+        }
+
         return CMUDictionaryIndex(
             version: CMUDictionaryIndex.currentVersion,
             wordToKeys: normalizedWordToKeys,
             keyToWords: normalizedKeyToWords,
             vowelGroupToKeys: normalizedVowelGroupToKeys,
-            vowelGroupConsonantClassToKeys: normalizedVowelGroupConsonantClassToKeys
+            vowelGroupConsonantClassToKeys: normalizedVowelGroupConsonantClassToKeys,
+            wordToSyllables: normalizedWordToSyllables
         )
     }
 
@@ -147,13 +168,14 @@ extension CMUDictionary {
 }
 
 nonisolated struct CMUDictionaryIndex: Codable, Sendable {
-    nonisolated static let currentVersion = 2
+    nonisolated static let currentVersion = 3
 
     var version: Int
     var wordToKeys: [String: [String]]
     var keyToWords: [String: [String]]
     var vowelGroupToKeys: [String: [String]]
     var vowelGroupConsonantClassToKeys: [String: [String]]
+    var wordToSyllables: [String: Int]
 }
 
 private enum SampleCMUDict {

@@ -21,6 +21,7 @@ struct EditorView: View {
     @State private var suggestionsTask: Task<Void, Never>?
 
     @State private var suggestions: [String] = []
+    @State private var barPosition: BarPosition?
 
     var body: some View {
         ZStack {
@@ -48,6 +49,10 @@ struct EditorView: View {
                     highlights: textHighlights,
                     suggestions: suggestions,
                     isLoadingSuggestions: !rhymeServiceReady,
+                    barPosition: barPosition,
+                    onSuggestionAccepted: { word in
+                        recordSuggestionAcceptance(word)
+                    },
                     preferredColorScheme: themeManager.theme.colorScheme,
                     preferredTextColor: themeManager.theme.textPrimary,
                     preferredTintColor: themeManager.theme.accent
@@ -66,8 +71,9 @@ struct EditorView: View {
                     EmptyView()
                 }
 
-                EditorSuggestionsBar(suggestions: suggestions, isLoading: !rhymeServiceReady) { word in
+                EditorSuggestionsBar(suggestions: suggestions, isLoading: !rhymeServiceReady, barPosition: barPosition) { word in
                     insertSuggestionFallback(word)
+                    recordSuggestionAcceptance(word)
                 }
                 #endif
             }
@@ -77,6 +83,8 @@ struct EditorView: View {
         .onAppear {
             composition.lastOpenedAt = Date()
             isLyricsFocused = true
+
+            ensureCompositionLexiconState()
 
             warmUpTask?.cancel()
             warmUpTask = Task {
@@ -88,7 +96,7 @@ struct EditorView: View {
             }
 
             scheduleRhymeAnalysis()
-            refreshSuggestions()
+            refreshAssist()
         }
         .onChange(of: composition.title) {
             scheduleAutosave()
@@ -96,10 +104,10 @@ struct EditorView: View {
         .onChange(of: composition.lyrics) {
             scheduleAutosave()
             scheduleRhymeAnalysis()
-            refreshSuggestions()
+            refreshAssist()
         }
         .onChange(of: lyricsSelectedRange) {
-            refreshSuggestions()
+            refreshAssist()
         }
         .onSubmit {
             isLyricsFocused = true
@@ -158,23 +166,44 @@ struct EditorView: View {
         }
     }
 
-    private func refreshSuggestions() {
+    private func refreshAssist() {
         suggestionsTask?.cancel()
 
         let textSnapshot = composition.lyrics
         let cursorSnapshot = lyricsSelectedRange.location
+
+        // Snapshot the lexicon on the main actor (SwiftData), then compute assist off-main.
+        let lexiconSnapshot = UserLexiconStore.fetchTopUserLexiconItems(in: modelContext, limit: 512)
+
         suggestionsTask = Task {
-            let next = await RhymeService.shared.suggestions(
+            let result = await RhymeService.shared.editorAssist(
                 text: textSnapshot,
-                cursorLocation: cursorSnapshot
+                cursorLocation: cursorSnapshot,
+                userLexicon: lexiconSnapshot,
+                maxCount: 12
             )
 
             guard !Task.isCancelled else { return }
             await MainActor.run {
-                suggestions = next
+                suggestions = result.suggestions
+                barPosition = result.barPosition
                 rhymeServiceReady = true
             }
         }
+    }
+
+    private func ensureCompositionLexiconState() {
+        guard composition.lexiconState == nil else { return }
+
+        let state = CompositionLexiconState(composition: composition)
+        composition.lexiconState = state
+        modelContext.insert(state)
+        try? modelContext.save()
+    }
+
+    private func recordSuggestionAcceptance(_ word: String) {
+        UserLexiconStore.recordAcceptedWord(word, in: modelContext)
+        try? modelContext.save()
     }
 
     private func insertSuggestionFallback(_ word: String) {
@@ -250,7 +279,7 @@ struct EditorView_Previews: PreviewProvider {
         NavigationStack {
             EditorView(composition: Composition(title: "Draft", lyrics: "Hello\nWorld"))
         }
-        .modelContainer(for: Composition.self, inMemory: true)
+        .modelContainer(for: [Composition.self, UserLexiconEntry.self, CompositionLexiconState.self], inMemory: true)
         .environmentObject(ThemeManager())
     }
 }

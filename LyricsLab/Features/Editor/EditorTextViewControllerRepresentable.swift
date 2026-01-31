@@ -10,6 +10,8 @@ struct EditorTextViewControllerRepresentable: UIViewControllerRepresentable {
     var highlights: [TextHighlight]
     var suggestions: [String]
     var isLoadingSuggestions: Bool
+    var barPosition: BarPosition?
+    var onSuggestionAccepted: ((String) -> Void)?
 
     var preferredColorScheme: ColorScheme? = nil
     var preferredTextColor: Color? = nil
@@ -32,6 +34,9 @@ struct EditorTextViewControllerRepresentable: UIViewControllerRepresentable {
                 isFocused = focused
             }
         }
+        vc.onSuggestionAccepted = { word in
+            onSuggestionAccepted?(word)
+        }
         return vc
     }
 
@@ -43,6 +48,7 @@ struct EditorTextViewControllerRepresentable: UIViewControllerRepresentable {
             highlights: highlights,
             suggestions: suggestions,
             isLoadingSuggestions: isLoadingSuggestions,
+            barPosition: barPosition,
             preferredColorScheme: preferredColorScheme,
             preferredTextColor: preferredTextColor,
             preferredTintColor: preferredTintColor
