@@ -106,7 +106,7 @@ extension AppTheme {
             // Catppuccin Mocha inspired, lavender-forward.
             return AppTheme(
                 id: id,
-                displayName: "DirtyDishes",
+                displayName: "dirtydishes",
                 colorScheme: .dark,
                 backgroundTop: Color(red: 0.11, green: 0.10, blue: 0.15),
                 backgroundBottom: Color(red: 0.06, green: 0.06, blue: 0.10),
