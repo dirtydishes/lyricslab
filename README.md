@@ -72,7 +72,7 @@ Built-in themes (currently):
 - `RetroFuturistic` (default)
 - `Plain Light`
 - `Plain Dark`
-- `dirtydishes` (DirtyDishes)
+- `dirtydishes` (calm lavender, catppuccin mocha inspired)
 - `Davy Dolla$` (money-green paper vibe, gold accents; title becomes `Lyric$Lab`)
 
 ---
