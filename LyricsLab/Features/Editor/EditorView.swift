@@ -8,6 +8,9 @@ struct EditorView: View {
 
     @EnvironmentObject private var themeManager: ThemeManager
 
+    @AppStorage(EditorPreferenceKeys.textAlignment) private var editorTextAlignmentRaw: String = EditorTextAlignment.left.rawValue
+    @AppStorage(EditorPreferenceKeys.ruledLinesEnabled) private var ruledLinesEnabled: Bool = false
+
     @State private var lyricsSelectedRange = NSRange(location: 0, length: 0)
     @State private var isLyricsFocused = false
     @State private var autosaveTask: Task<Void, Never>?
@@ -54,6 +57,8 @@ struct EditorView: View {
                     onSetSectionOverride: { anchor, bars in
                         applySectionOverride(anchor: anchor, barCount: bars)
                     },
+                    editorTextAlignment: EditorTextAlignment(rawValue: editorTextAlignmentRaw) ?? .left,
+                    showsRuledLines: ruledLinesEnabled,
                     highlights: textHighlights,
                     suggestions: suggestions,
                     isLoadingSuggestions: !rhymeServiceReady,

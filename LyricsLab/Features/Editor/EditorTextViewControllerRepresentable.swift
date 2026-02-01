@@ -11,6 +11,9 @@ struct EditorTextViewControllerRepresentable: UIViewControllerRepresentable {
     var sectionBrackets: [SectionBracket]
     var onSetSectionOverride: ((String, Int?) -> Void)?
 
+    var editorTextAlignment: EditorTextAlignment
+    var showsRuledLines: Bool
+
     var highlights: [TextHighlight]
     var suggestions: [String]
     var isLoadingSuggestions: Bool
@@ -63,6 +66,8 @@ struct EditorTextViewControllerRepresentable: UIViewControllerRepresentable {
             barPosition: barPosition,
             endRhymeTailLength: endRhymeTailLength,
             sectionBrackets: sectionBrackets,
+            editorTextAlignment: editorTextAlignment,
+            showsRuledLines: showsRuledLines,
             preferredColorScheme: preferredColorScheme,
             preferredTextColor: preferredTextColor,
             preferredTintColor: preferredTintColor
