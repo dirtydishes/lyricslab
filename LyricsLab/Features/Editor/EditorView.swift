@@ -8,6 +8,9 @@ struct EditorView: View {
 
     @EnvironmentObject private var themeManager: ThemeManager
 
+    @AppStorage(EditorPreferenceKeys.textAlignment) private var editorTextAlignmentRaw: String = EditorTextAlignment.left.rawValue
+    @AppStorage(EditorPreferenceKeys.ruledLinesEnabled) private var ruledLinesEnabled: Bool = false
+
     @State private var lyricsSelectedRange = NSRange(location: 0, length: 0)
     @State private var isLyricsFocused = false
     @State private var autosaveTask: Task<Void, Never>?
@@ -22,6 +25,9 @@ struct EditorView: View {
 
     @State private var suggestions: [String] = []
     @State private var barPosition: BarPosition?
+
+    @State private var sectionTask: Task<Void, Never>?
+    @State private var sectionBrackets: [SectionBracket] = []
 
     var body: some View {
         ZStack {
@@ -47,6 +53,12 @@ struct EditorView: View {
                     selectedRange: $lyricsSelectedRange,
                     isFocused: $isLyricsFocused,
                     endRhymeTailLength: $composition.endRhymeTailLength,
+                    sectionBrackets: sectionBrackets,
+                    onSetSectionOverride: { anchor, bars in
+                        applySectionOverride(anchor: anchor, barCount: bars)
+                    },
+                    editorTextAlignment: EditorTextAlignment(rawValue: editorTextAlignmentRaw) ?? .left,
+                    showsRuledLines: ruledLinesEnabled,
                     highlights: textHighlights,
                     suggestions: suggestions,
                     isLoadingSuggestions: !rhymeServiceReady,
@@ -110,6 +122,7 @@ struct EditorView: View {
 
             scheduleRhymeAnalysis()
             refreshAssist()
+            scheduleSectionDetection()
         }
         .onChange(of: composition.title) {
             scheduleAutosave()
@@ -118,12 +131,16 @@ struct EditorView: View {
             scheduleAutosave()
             scheduleRhymeAnalysis()
             refreshAssist()
+            scheduleSectionDetection()
         }
         .onChange(of: composition.endRhymeTailLength) {
             // End-rhyme tail length affects both highlights (end groups) and suggestion targeting.
             scheduleAutosave()
             scheduleRhymeAnalysis()
             refreshAssist()
+        }
+        .onChange(of: composition.sectionOverridesBlob) {
+            scheduleSectionDetection()
         }
         .onChange(of: lyricsSelectedRange) {
             refreshAssist()
@@ -140,6 +157,9 @@ struct EditorView: View {
 
             suggestionsTask?.cancel()
             suggestionsTask = nil
+
+            sectionTask?.cancel()
+            sectionTask = nil
 
             warmUpTask?.cancel()
             warmUpTask = nil
@@ -210,6 +230,31 @@ struct EditorView: View {
                 barPosition = result.barPosition
                 rhymeServiceReady = true
             }
+        }
+    }
+
+    private func scheduleSectionDetection() {
+        sectionTask?.cancel()
+        sectionTask = Task {
+            try? await Task.sleep(for: .milliseconds(350))
+
+            let snapshot = await MainActor.run { composition.lyrics }
+            let overridesBlob = await MainActor.run { composition.sectionOverridesBlob }
+            let next = SectionDetector.detectBrackets(text: snapshot, overridesBlob: overridesBlob)
+
+            guard !Task.isCancelled else { return }
+            await MainActor.run {
+                sectionBrackets = next
+            }
+        }
+    }
+
+    private func applySectionOverride(anchor: String, barCount: Int?) {
+        let next = SectionDetector.applyOverride(blob: composition.sectionOverridesBlob, anchor: anchor, barCount: barCount)
+        if composition.sectionOverridesBlob != next {
+            composition.sectionOverridesBlob = next
+            scheduleAutosave()
+            scheduleSectionDetection()
         }
     }
 

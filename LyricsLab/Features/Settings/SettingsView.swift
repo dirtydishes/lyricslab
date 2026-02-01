@@ -1,5 +1,9 @@
 import SwiftUI
 
+// Pull in Editor settings subview.
+// (Also ensures the compiler sees the type when SettingsView is built.)
+
+
 struct SettingsView: View {
     @EnvironmentObject private var themeManager: ThemeManager
     @AppStorage("icloudSyncEnabled") private var iCloudSyncEnabled = true
@@ -28,6 +32,14 @@ struct SettingsView: View {
                         }
                     }
                     .pickerStyle(.navigationLink)
+                }
+
+                Section {
+                    NavigationLink("Editor") {
+                        EditorSettingsView()
+                    }
+                } header: {
+                    Text("Editor")
                 }
 
                 Section {
